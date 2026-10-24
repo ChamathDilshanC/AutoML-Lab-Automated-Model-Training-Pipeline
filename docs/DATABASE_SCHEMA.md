@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
+> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4) and `models` (M5) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
 
 Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -83,6 +83,8 @@ erDiagram
 | `selected_metric`, `metrics` | |
 | `approval_status` | e.g. `PENDING`, `APPROVED`, `REVOKED` (names Proposed) |
 | `created_at` | |
+
+**Implemented columns (M5).** `models`: `model_id` (PK, `md_` + hex; identifies one immutable artifact, unlike the sketch above where it was the logical model), `version` (integer, counted per owner, dataset, target column and task; unique together with them), `owner_id`, `dataset_id`, `experiment_id`, `run_id`, `task`, `target_column`, `algorithm`, `metric`, `metrics` (winner's test scores), `hyperparameters`, `feature_schema` (JSON), `classes` (JSON, classification only), `library_versions`, `artifact_key`, `metadata_key`, `artifact_sha256`, `artifact_bytes`, `approval_status` (`PENDING`, `APPROVED`), `approved_at`, `created_at`. There is no update path for the artifact fields. `REVOKED` and deployment status are not implemented.
 
 ### 3.5 AuditEvent
 `event_id`, `actor`, `action`, `resource_id`, `timestamp`, `outcome`. **Never** stores dataset row values, secrets or tokens.

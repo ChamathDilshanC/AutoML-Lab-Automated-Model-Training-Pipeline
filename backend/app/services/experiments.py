@@ -157,7 +157,9 @@ def _run_response(run: ExperimentRun) -> ExperimentRunResponse:
     )
 
 
-def build_leaderboard(experiment: Experiment, runs: list[ExperimentRun]) -> LeaderboardResponse:
+def build_leaderboard(
+    experiment: Experiment, runs: list[ExperimentRun], model_id: str | None = None
+) -> LeaderboardResponse:
     """Ranked runs first (best first), then successful but unranked runs, then failed runs."""
     spec = METRICS[experiment.task][experiment.metric]  # type: ignore[index]
 
@@ -183,6 +185,7 @@ def build_leaderboard(experiment: Experiment, runs: list[ExperimentRun]) -> Lead
         higher_is_better=spec.higher_is_better,
         runs=[_run_response(run) for run in sorted(runs, key=order)],
         selected_run_id=experiment.selected_run_id,
+        model_id=model_id,
         selection_reason=reason,
         split=experiment.split_info,
         library_versions=experiment.library_versions,

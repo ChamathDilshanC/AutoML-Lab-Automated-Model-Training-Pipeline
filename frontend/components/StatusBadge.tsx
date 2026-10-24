@@ -1,6 +1,6 @@
-import type { DatasetStatus, ExperimentStatus } from "@/lib/types";
+import type { ApprovalStatus, DatasetStatus, ExperimentStatus } from "@/lib/types";
 
-type BadgeStatus = DatasetStatus | ExperimentStatus;
+type BadgeStatus = DatasetStatus | ExperimentStatus | ApprovalStatus;
 
 const STATUS: Record<BadgeStatus, { label: string; icon: string; color: string }> = {
   UPLOADED: { label: "Uploaded, not validated", icon: "●", color: "text-accent" },
@@ -11,6 +11,8 @@ const STATUS: Record<BadgeStatus, { label: string; icon: string; color: string }
   RUNNING: { label: "Running", icon: "◐", color: "text-accent" },
   SUCCEEDED: { label: "Succeeded", icon: "✓", color: "text-success" },
   FAILED: { label: "Failed", icon: "✕", color: "text-danger" },
+  PENDING: { label: "Pending approval", icon: "○", color: "text-warning" },
+  APPROVED: { label: "Approved", icon: "✓", color: "text-success" },
 };
 
 /** Status is conveyed by text and icon as well as colour. */

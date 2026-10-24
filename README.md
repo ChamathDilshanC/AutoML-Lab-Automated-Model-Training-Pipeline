@@ -7,7 +7,7 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Milestones M1 to M4 are in place: upload a CSV, review its data-quality report, configure an experiment, and watch a separate worker train the candidate models and rank them on a leaderboard. The model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
+Milestones M1 to M5 are in place: upload a CSV, review its data-quality report, configure an experiment, watch a separate worker train the candidate models and rank them on a leaderboard, then approve the winning model and get predictions from it in the browser or over the API. Authentication, rate limiting and cloud deployment are not implemented yet. See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start (local)
 ```bash

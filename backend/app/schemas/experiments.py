@@ -75,6 +75,7 @@ class LeaderboardResponse(BaseModel):
     higher_is_better: bool
     runs: list[ExperimentRunResponse]  # ranked runs first, then unranked, then failed
     selected_run_id: str | None
+    model_id: str | None  # the registered model, once the experiment has succeeded
     selection_reason: SelectionReason | None
     split: dict[str, Any] | None
     library_versions: dict[str, str] | None

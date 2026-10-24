@@ -73,3 +73,12 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - Experiment reads are owner-scoped and return `404` for other owners' IDs (the owner is still a placeholder until M7).
 - `Idempotency-Key` prevents duplicate queued jobs from double submits. It is not a security control.
 - **Not implemented:** per-job CPU, memory or wall-clock limits. `JOB_TIMEOUT_SECONDS` only marks a `RUNNING` job `FAILED` after the fact; it cannot stop a training call that is stuck. A malicious or huge dataset can therefore still tie up the worker within the upload limits. Real limits need process isolation (for example a subprocess per job with resource limits), which is open work.
+
+## 14. Implemented so far (M5)
+- Artifacts are written only by the worker through `register_model`. Each has a SHA-256 stored in the database that is checked before every `joblib.load`; a mismatch or a missing file returns a generic error and nothing is deserialised ([ADR 0002](ADR/0002-trusted-joblib-artifacts.md)). Tests prove that a tampered artifact never reaches `joblib.load` and that, across repeated predictions with hostile-looking strings, `joblib.load` runs once and only on the artifact.
+- Prediction input is JSON checked field by field (exact field set, types, string length, finite numbers, batch size). Error details name fields and rows, never values.
+- A model must be explicitly approved (`{"confirm": true}`) before it serves predictions. Approval cannot be undone yet.
+- A model trained with another scikit-learn version is refused rather than loaded.
+- Which version answered each request is logged with the request ID and row count, never the input values.
+- The model's feature schema lists the string values seen in training for columns with at most 50 distinct values, so the form can offer them. That is the owner's own data, shown only to the owner, but it means a categorical column's values are exposed through `GET /api/v1/models`. Columns with more distinct values list none.
+- **Not implemented:** authentication, rate limiting on `/predict`, a prediction-specific request-size limit (the general upload body limit applies), revoking approval, deleting models and artifacts, and removing a deleted dataset's models.

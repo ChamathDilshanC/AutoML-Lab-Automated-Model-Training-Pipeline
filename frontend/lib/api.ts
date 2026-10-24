@@ -5,7 +5,10 @@ import type {
   Experiment,
   ExperimentCreate,
   ExperimentOptions,
+  FeatureValue,
   Leaderboard,
+  PredictionResponse,
+  RegisteredModel,
   ValidationReport,
 } from "@/lib/types";
 
@@ -86,6 +89,33 @@ export function getLeaderboard(experimentId: string, signal?: AbortSignal): Prom
     `/api/v1/experiments/${encodeURIComponent(experimentId)}/results`,
     { signal },
   );
+}
+
+export function listModels(signal?: AbortSignal): Promise<RegisteredModel[]> {
+  return request<RegisteredModel[]>("/api/v1/models", { signal });
+}
+
+export function getModel(modelId: string, signal?: AbortSignal): Promise<RegisteredModel> {
+  return request<RegisteredModel>(`/api/v1/models/${encodeURIComponent(modelId)}`, { signal });
+}
+
+export function approveModel(modelId: string): Promise<RegisteredModel> {
+  return request<RegisteredModel>(`/api/v1/models/${encodeURIComponent(modelId)}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function predict(
+  modelId: string,
+  instances: Record<string, FeatureValue>[],
+): Promise<PredictionResponse> {
+  return request<PredictionResponse>(`/api/v1/models/${encodeURIComponent(modelId)}/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instances }),
+  });
 }
 
 /** Upload with progress reporting (fetch cannot report upload progress). */

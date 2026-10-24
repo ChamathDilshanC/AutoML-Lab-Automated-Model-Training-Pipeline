@@ -106,6 +106,7 @@ export interface Leaderboard {
   higher_is_better: boolean;
   runs: ExperimentRun[];
   selected_run_id: string | null;
+  model_id: string | null;
   selection_reason: {
     metric: string;
     direction: "higher_is_better" | "lower_is_better";
@@ -114,4 +115,46 @@ export interface Leaderboard {
   } | null;
   split: { strategy: string; test_size: number; random_state: number; n_train: number; n_test: number } | null;
   library_versions: Record<string, string> | null;
+}
+
+export type ApprovalStatus = "PENDING" | "APPROVED";
+
+export interface FeatureSpec {
+  name: string;
+  kind: "numeric" | "categorical";
+  value_type: "number" | "string" | "boolean";
+  categories: string[] | null;
+}
+
+export interface RegisteredModel {
+  model_id: string;
+  version: number;
+  dataset_id: string;
+  dataset_filename: string | null;
+  experiment_id: string;
+  run_id: string;
+  task: Task;
+  target_column: string;
+  algorithm: string;
+  metric: string;
+  metrics: Record<string, number | null>;
+  hyperparameters: Record<string, unknown>;
+  feature_schema: FeatureSpec[];
+  classes: (string | number | boolean)[] | null;
+  library_versions: Record<string, string>;
+  artifact_bytes: number;
+  approval_status: ApprovalStatus;
+  approved_at: string | null;
+  created_at: string;
+}
+
+export type FeatureValue = string | number | boolean | null;
+
+export interface PredictionResponse {
+  model_id: string;
+  model_version: number;
+  predictions: (string | number | boolean | null)[];
+  classes: (string | number | boolean)[] | null;
+  probabilities: Record<string, number>[] | null;
+  request_id: string | null;
 }

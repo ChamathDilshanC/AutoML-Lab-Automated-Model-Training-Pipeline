@@ -77,3 +77,39 @@ class ExperimentRun(Base):
     error_summary: Mapped[str | None] = mapped_column(String(500), nullable=True)
     rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class RegisteredModel(Base):
+    """An immutable, versioned model artifact produced by an experiment.
+
+    `model_id` identifies one artifact. `version` counts the artifacts registered for the same
+    owner, dataset, target column and task, so re-running an experiment yields version 2.
+    """
+
+    __tablename__ = "models"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "dataset_id", "target_column", "task", "version"),
+    )
+
+    model_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer)
+    owner_id: Mapped[str] = mapped_column(String(128), index=True)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.dataset_id"), index=True)
+    experiment_id: Mapped[str] = mapped_column(ForeignKey("experiments.experiment_id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("experiment_runs.run_id"))
+    task: Mapped[str] = mapped_column(String(32))
+    target_column: Mapped[str] = mapped_column(String(255))
+    algorithm: Mapped[str] = mapped_column(String(64))
+    metric: Mapped[str] = mapped_column(String(32))
+    metrics: Mapped[dict[str, float | None]] = mapped_column(JSON)
+    hyperparameters: Mapped[dict[str, Any]] = mapped_column(JSON)
+    feature_schema: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    classes: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    library_versions: Mapped[dict[str, str]] = mapped_column(JSON)
+    artifact_key: Mapped[str] = mapped_column(String(512))
+    metadata_key: Mapped[str] = mapped_column(String(512))
+    artifact_sha256: Mapped[str] = mapped_column(String(64))
+    artifact_bytes: Mapped[int] = mapped_column(Integer)
+    approval_status: Mapped[str] = mapped_column(String(32))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

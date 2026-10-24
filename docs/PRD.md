@@ -48,6 +48,8 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | FR-010, FR-011, FR-012, FR-013, FR-014 | **Implemented (M4)**: experiment configuration and validation, queueing, idempotent submission, status and error display |
 | FR-031, FR-032 | **Implemented (M4)**: leaderboard with all metrics and a selection explanation, and a real-world performance caveat |
 | FR-015, FR-016, FR-033 | Not implemented (cancellation, time-aware split, metric charts) |
+| FR-040, FR-041, FR-042, FR-043 | **Implemented (M5)**: the winning pipeline is saved as a versioned artifact with metadata; versions are immutable (no update path); models start `PENDING` and only `APPROVED` ones serve predictions; list and detail views |
+| FR-050, FR-051, FR-052, FR-053, FR-054 | **Implemented (M5)**: strict schema validation, batch-size limit, predictions with model version and request ID, version logged per request, and a prediction form generated from the schema. FR-051's request-size limit is the general body limit, not a prediction-specific one |
 | All other features in this PRD | Proposed |
 
 ## 6. MVP scope (Definition of Done for the first portfolio release)

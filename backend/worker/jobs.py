@@ -19,11 +19,12 @@ from app.db import experiments as repo
 from app.db.models import Dataset, Experiment, ExperimentRun
 from app.schemas.datasets import DatasetStatus
 from app.schemas.experiments import ExperimentStatus, RunStatus
+from app.services.model_store import register_model
 from app.services.storage import StorageAdapter
 from automl.evaluator import evaluate, rank_results
 from automl.splits import separate_target, split_data
 from automl.tasks import Task
-from automl.trainer import library_versions, train_model
+from automl.trainer import TrainedModel, library_versions, train_model
 from automl.validation import DataValidationError, read_csv_bytes, validate_target
 
 logger = logging.getLogger("worker")
@@ -32,6 +33,8 @@ UNEXPECTED_FAILURE = "Unexpected error while running the experiment."
 RUN_FAILURE = "Training failed for this algorithm."
 NO_RESULT = "No algorithm produced a usable result."
 DATASET_UNAVAILABLE = "The dataset is no longer available."
+MODEL_NOT_SAVED = "The winning model could not be saved."
+DEFAULT_MAX_ARTIFACT_BYTES = 200 * 1024 * 1024
 
 
 class JobFailure(Exception):
@@ -53,8 +56,18 @@ def _jsonable(value: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def run_experiment(session: Session, storage: StorageAdapter, experiment: Experiment) -> None:
-    """Load the dataset, train and evaluate each algorithm, and record the outcome."""
+def run_experiment(
+    session: Session,
+    storage: StorageAdapter,
+    experiment: Experiment,
+    *,
+    max_artifact_bytes: int = DEFAULT_MAX_ARTIFACT_BYTES,
+) -> None:
+    """Load the dataset, train and evaluate each algorithm, and record the outcome.
+
+    The winning pipeline is saved before the experiment is marked `SUCCEEDED`, so a succeeded
+    experiment always has a registered model. The other pipelines are discarded.
+    """
     dataset = session.get(Dataset, experiment.dataset_id)
     if dataset is None or dataset.status != DatasetStatus.READY:
         raise JobFailure(DATASET_UNAVAILABLE)
@@ -75,6 +88,7 @@ def run_experiment(session: Session, storage: StorageAdapter, experiment: Experi
         raise JobFailure(str(exc)) from None
 
     runs: dict[str, ExperimentRun] = {}
+    fitted: dict[str, TrainedModel] = {}
     metrics_by_algorithm: dict[str, dict[str, float | None]] = {}
     versions: dict[str, str] | None = None
 
@@ -108,6 +122,7 @@ def run_experiment(session: Session, storage: StorageAdapter, experiment: Experi
             continue
 
         versions = model.library_versions
+        fitted[algorithm] = model
         metrics_by_algorithm[algorithm] = metrics
         runs[algorithm] = repo.add_run(
             session,
@@ -133,18 +148,35 @@ def run_experiment(session: Session, storage: StorageAdapter, experiment: Experi
             session, experiment, status=ExperimentStatus.FAILED, error_summary=NO_RESULT
         )
         return
+    split_info = {
+        "strategy": split.strategy,
+        "test_size": split.test_size,
+        "random_state": split.random_state,
+        "n_train": len(split.X_train),
+        "n_test": len(split.X_test),
+    }
+    winner = ranking[0]
+    try:
+        register_model(
+            session,
+            storage,
+            experiment=experiment,
+            run=runs[winner],
+            trained=fitted[winner],
+            X_train=split.X_train,
+            split_info=split_info,
+            max_artifact_bytes=max_artifact_bytes,
+        )
+    except Exception:
+        logger.exception("Could not save the model for experiment %s", experiment.experiment_id)
+        raise JobFailure(MODEL_NOT_SAVED) from None
+
     repo.finish_experiment(
         session,
         experiment,
         status=ExperimentStatus.SUCCEEDED,
-        selected_run_id=runs[ranking[0]].run_id,
-        split_info={
-            "strategy": split.strategy,
-            "test_size": split.test_size,
-            "random_state": split.random_state,
-            "n_train": len(split.X_train),
-            "n_test": len(split.X_test),
-        },
+        selected_run_id=runs[winner].run_id,
+        split_info=split_info,
         library_versions=versions or library_versions(),
     )
 
@@ -161,6 +193,7 @@ def process_next(
     storage: StorageAdapter,
     *,
     job_timeout_seconds: int = 3600,
+    max_artifact_bytes: int = DEFAULT_MAX_ARTIFACT_BYTES,
 ) -> bool:
     """Claim and run one queued experiment. Returns True if a job was processed.
 
@@ -175,7 +208,7 @@ def process_next(
                 return False
             logger.info("Claimed experiment %s", experiment.experiment_id)
             try:
-                run_experiment(session, storage, experiment)
+                run_experiment(session, storage, experiment, max_artifact_bytes=max_artifact_bytes)
             except JobFailure as failure:
                 _fail(session, experiment, str(failure))
             except Exception:
@@ -195,9 +228,15 @@ def run_loop(
     poll_seconds: float,
     job_timeout_seconds: int,
     should_stop: Callable[[], bool],
+    max_artifact_bytes: int = DEFAULT_MAX_ARTIFACT_BYTES,
     sleep: Callable[[float], object] = time.sleep,
 ) -> None:
     """Poll for queued experiments until `should_stop()` is true."""
     while not should_stop():
-        if not process_next(session_factory, storage, job_timeout_seconds=job_timeout_seconds):
+        if not process_next(
+            session_factory,
+            storage,
+            job_timeout_seconds=job_timeout_seconds,
+            max_artifact_bytes=max_artifact_bytes,
+        ):
             sleep(poll_seconds)

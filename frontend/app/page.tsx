@@ -14,6 +14,9 @@ export default function Home() {
           className="inline-block rounded-md bg-accent px-4 py-2 font-medium text-on-accent"
         >
           Upload a dataset
+        </Link>{" "}
+        <Link href="/models" className="ml-2 inline-block rounded-md border border-border px-4 py-2 font-medium">
+          Models
         </Link>
       </div>
       <HealthStatus />

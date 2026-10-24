@@ -343,3 +343,44 @@ def test_worker_does_not_import_the_web_framework() -> None:
         [sys.executable, "-c", code], cwd=BACKEND_DIR, capture_output=True, text=True, timeout=120
     )
     assert result.returncode == 0, f"worker imported web code: {result.stdout} {result.stderr}"
+
+
+# --- model registration -------------------------------------------------------------------------
+
+
+def test_a_failure_to_save_the_model_fails_the_experiment_and_leaves_no_files(
+    client: TestClient, session_factory: sessionmaker[Session], tmp_path: Path
+) -> None:
+    class FailsOnMetadata(LocalStorage):
+        def save(self, key: str, source, max_bytes: int) -> int:  # type: ignore[no-untyped-def]
+            if key.endswith("metadata.json"):
+                raise OSError("disk full")
+            return super().save(key, source, max_bytes)
+
+    flaky = FailsOnMetadata(tmp_path / "storage")
+    dataset_id = ready_dataset(client, classification_csv())
+    experiment_id = queue(client, classification_payload(dataset_id, algorithms=["decision_tree"]))
+    assert process_next(session_factory, flaky) is True
+
+    experiment = status_of(client, experiment_id)
+    assert experiment["status"] == "FAILED"
+    assert experiment["error_summary"] == "The winning model could not be saved."
+    assert "disk full" not in str(experiment)
+    board = results_of(client, experiment_id)
+    assert board["model_id"] is None and board["runs"][0]["status"] == "SUCCEEDED"
+    assert client.get("/api/v1/models").json() == []
+    assert not list((tmp_path / "storage" / "models").rglob("*.*"))  # artifact was removed
+
+
+def test_only_the_winning_pipeline_is_saved(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+    storage: LocalStorage,
+    tmp_path: Path,
+) -> None:
+    dataset_id = ready_dataset(client, classification_csv())
+    experiment_id = queue(client, classification_payload(dataset_id))
+    assert process_next(session_factory, storage) is True
+    saved = [p for p in (tmp_path / "storage" / "models").rglob("*") if p.is_file()]
+    assert sorted(p.name for p in saved) == ["metadata.json", "model.joblib"]
+    assert results_of(client, experiment_id)["model_id"] in str(saved[0])

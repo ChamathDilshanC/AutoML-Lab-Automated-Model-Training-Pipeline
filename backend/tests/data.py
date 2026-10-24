@@ -1,8 +1,14 @@
 """Small deterministic datasets and helpers shared by the API and worker tests."""
 
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.services.storage import StorageAdapter
+from worker.jobs import process_next
 
 
 def classification_csv(rows: int = 80) -> bytes:
@@ -70,3 +76,23 @@ def regression_payload(dataset_id: str, **overrides: object) -> dict[str, object
     }
     payload.update(overrides)
     return payload
+
+
+def trained_model_id(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+    storage: StorageAdapter,
+    content: bytes,
+    payload_for: Callable[..., dict[str, object]] = classification_payload,
+    dataset_id: str | None = None,
+    **overrides: object,
+) -> str:
+    """Run a real experiment through the worker and return the registered model's ID."""
+    dataset_id = dataset_id or ready_dataset(client, content)
+    created = client.post("/api/v1/experiments", json=payload_for(dataset_id, **overrides))
+    assert created.status_code == 202, created.text
+    experiment_id = created.json()["experiment_id"]
+    assert process_next(session_factory, storage) is True
+    board = client.get(f"/api/v1/experiments/{experiment_id}/results").json()
+    assert board["model_id"], board
+    return str(board["model_id"])

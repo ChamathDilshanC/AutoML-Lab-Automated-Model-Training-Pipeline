@@ -32,7 +32,8 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 | ADR | Title | Status |
 |---|---|---|
 | [0001](ADR/0001-local-first-adapter-architecture.md) | Local-first, adapter-based architecture | Accepted (not yet implemented) |
-| [0002](ADR/0002-trusted-joblib-artifacts.md) | Trusted joblib artifacts only | Proposed |
+| [0002](ADR/0002-trusted-joblib-artifacts.md) | Trusted joblib artifacts only | Accepted (implemented in M5) |
+| [0003](ADR/0003-save-winning-model-at-training-time.md) | Save the winning model at training time | Accepted (implemented in M5) |
 
 ## Requirement traceability
 PRD requirement IDs map to roadmap milestones in [ROADMAP.md](ROADMAP.md), to routes in [API_SPEC.md](API_SPEC.md), to screens in [DESIGN_SYSTEM.md § 8](DESIGN_SYSTEM.md#8-screen-inventory-proposed), and to test layers in [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
