@@ -7,7 +7,7 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Milestone M1 (Foundation) scaffold is in place: Next.js shell, FastAPI service with `GET /health`, SQLite session setup, CI, and a Docker Compose definition. Datasets, experiments, training, the model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
+Milestones M1 (foundation), M3 (ML engine) and M2 (dataset workflow) are in place: you can upload a CSV in the web UI, have it validated, and see its schema and data-quality warnings. Experiments, the model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start (local)
 ```bash

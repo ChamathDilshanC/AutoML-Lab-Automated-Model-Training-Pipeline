@@ -10,8 +10,8 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 
 | Area | State |
 |---|---|
-| Frontend | **Implemented (M1):** Next.js App Router shell with a backend health indicator (`frontend/`) |
-| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). No routes under `/api/v1` yet, no metadata tables |
+| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), design tokens in `globals.css` (`frontend/`) |
+| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. No experiment or model routes yet |
 | ML engine | **Implemented (M3):** `backend/automl/` provides dataset and target validation, a `ColumnTransformer` preprocessor, stratified/random splits, the algorithm allowlist with train-only grid search, held-out evaluation, and metric-aware ranking. It is not yet wired to the API or worker. `registry.py` is still a stub (M5) |
 | Worker | **Stub (M1):** `backend/worker/main.py` logs and exits |
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
@@ -22,11 +22,12 @@ Engine functions (all in `backend/automl/`):
 
 | Module | Public functions |
 |---|---|
-| `validation.py` | `validate_headers`, `validate_dataframe`, `validate_target`, `ValidationLimits`, `DataValidationError` |
+| `validation.py` | `read_csv_bytes`, `validate_headers`, `validate_dataframe`, `validate_target`, `ValidationLimits`, `DataValidationError` |
 | `preprocessing.py` | `split_column_types`, `build_preprocessor` (unfitted; fitted inside the training pipeline) |
 | `splits.py` | `separate_target`, `split_data` returning a `DataSplit` that records strategy, test size and seed |
 | `trainer.py` | `ESTIMATORS` allowlist, `available_algorithms`, `train_model` returning a `TrainedModel` (pipeline, best parameters, CV score, feature names, library versions) |
 | `evaluator.py` | `METRICS` with direction, `evaluate`, `rank_results`, `scoring_for` |
+| `quality.py` | `summarize_schema`, `quality_warnings` |
 
 Everything else in this document is the target design.
 

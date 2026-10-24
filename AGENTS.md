@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 Foundation and M3 ML engine.** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. Datasets, experiments (API/worker orchestration), the model registry and prediction are **not implemented**. Check the tree before assuming anything else exists.
+**Current state: M1 Foundation, M2 Dataset workflow and M3 ML engine.** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload and validation work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). Experiments (API/worker orchestration), the model registry and prediction are **not implemented**. Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).

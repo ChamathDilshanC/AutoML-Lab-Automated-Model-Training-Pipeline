@@ -58,3 +58,11 @@ Private reporting channel **TBD** (recommend enabling GitHub private vulnerabili
 
 ## 11. Open questions
 Auth provider; API credential model; rate-limit values; retention windows; whether to add a malware scan on uploads.
+
+## 12. Implemented so far (M2)
+- Client filenames are sanitised for display only; storage keys are built from server-generated IDs.
+- The local storage adapter rejects keys that resolve outside its root, writes through a temporary file, and removes partial files when the size cap is hit.
+- Upload size is capped at write time (`MAX_UPLOAD_BYTES`) and, when `Content-Length` is declared, refused up front. A chunked upload without `Content-Length` is still parsed before the cap applies; a stricter limit would need a streaming parser or a reverse proxy.
+- Errors use one envelope with a request ID, never include stack traces, paths or cell values, and validation details name fields only.
+- Dataset reads are scoped to the owner and return `404` for foreign IDs. The owner is a fixed placeholder until authentication exists (M7), so this is not yet real access control.
+- Not implemented yet: authentication, rate limiting, malware scanning, retention and deletion.

@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str = "sqlite:///./automl.db"
     artifact_dir: str = "./artifacts"
+    # Proposed default; the real limit is an open decision (docs/PRD.md, NFR-005).
+    max_upload_bytes: int = 10 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:3000"]
 
 

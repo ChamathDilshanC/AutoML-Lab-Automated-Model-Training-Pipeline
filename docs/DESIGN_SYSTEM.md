@@ -1,6 +1,8 @@
 # Design System
 
-> **Status:** no UI exists yet. Everything here is **Proposed**. Tokens listed are starting values to be implemented as CSS variables / theme tokens in the Next.js app; none of them exist in code today. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
+> **Status:** only the dataset pages exist (M2); everything else here is **Proposed**. Tokens listed are starting values to be implemented as CSS variables / theme tokens in the Next.js app; none of them exist in code today. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
+
+**Implemented (M2):** the colour tokens below are CSS variables in `frontend/app/globals.css` with a `prefers-color-scheme` dark theme (no manual override yet), plus `StatusBadge`, `DatasetUploader` and `DataQualityReport` and the routes `/datasets/new` and `/datasets/[id]`. Verified in a headless browser in light and dark; no automated UI tests yet.
 
 Related: [PRD](PRD.md) · [Architecture § 6.1](ARCHITECTURE.md#61-nextjs-frontend)
 
@@ -26,6 +28,7 @@ Neutral, technical, light and dark themes, one accent colour, tabular numerals f
 | `--surface` | `#F3F4F6` | `#161C2E` | Cards, panels, table headers |
 | `--text` | `#111827` | `#E5E7EB` | Body text |
 | `--text-muted` | `#4B5563` | `#9CA3AF` | Secondary text |
+| `--border` | `#D1D5DB` | `#2B3350` | Dividers and card outlines (added in M2; not a text colour) |
 | `--accent` | `#2563EB` | `#60A5FA` | Primary actions, links, focus ring |
 | `--on-accent` | `#FFFFFF` | `#0B1020` | Text on accent fills |
 | `--success` | `#15803D` | `#4ADE80` | `SUCCEEDED`, `READY` |
