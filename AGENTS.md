@@ -1,0 +1,89 @@
+# AGENTS.md — Guide for coding agents
+
+Instructions for any AI or automated coding agent working in this repository. They are vendor-neutral. Humans should read [CONTRIBUTING.md](CONTRIBUTING.md) as well.
+
+## 1. Repository purpose
+**AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
+
+**Current state: greenfield.** The repository contains documentation only (`docs/`, root `*.md`) plus `.gitignore`. There is no frontend, backend, worker, infrastructure code, tests or CI yet. Do not assume any of them exists; check the tree.
+
+## 2. Source-of-truth order
+1. Code, configuration and tests in the repository (once they exist).
+2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API_SPEC.md](docs/API_SPEC.md), [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md), [docs/SECURITY.md](docs/SECURITY.md).
+3. [docs/PRD.md](docs/PRD.md) for what to build and why; [docs/ROADMAP.md](docs/ROADMAP.md) for order.
+4. [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) for UI.
+If code and docs disagree, trust the code, then fix the docs in the same change. Documents labelled **Proposed** are plans, not facts.
+
+## 3. Directory ownership (target layout)
+| Path | Purpose | Rule |
+|---|---|---|
+| `frontend/` | Next.js app | No AWS credentials; use tokens from the design system |
+| `backend/app/` | FastAPI service | Ownership checks on every resource; safe errors |
+| `backend/automl/` | ML engine | **Must not import AWS SDKs or web frameworks** |
+| `backend/worker/` | Job runner | Never executes user-supplied code |
+| `backend/tests/` | Tests | Deterministic fixtures, fixed seeds |
+| `infrastructure/terraform/` | IaC | No secrets, no committed state |
+| `docs/` | Documentation | Update with behaviour changes |
+Create these directories only when the corresponding milestone starts ([docs/ROADMAP.md](docs/ROADMAP.md)).
+
+## 4. Stack conventions
+- **Python (backend, engine, worker):** typed code, small modules, no global mutable state in the engine. Formatter, linter and type checker are **TBD** — pick them once, in M1, and record them here.
+- **TypeScript / Next.js (frontend):** strict TypeScript; components consume design tokens; no direct S3 access with permanent credentials.
+- **ML rules (non-negotiable):** the target is never a feature; fit imputers/encoders/scalers/feature selection on training data only; keep the test set out of hyper-parameter selection; record seed, split strategy, metric definition and library versions; metric direction must be explicit.
+- **Algorithms:** use only the allowlist in [docs/ARCHITECTURE.md § 6.5](docs/ARCHITECTURE.md#65-training-worker). Never import code or class names from dataset content or user configuration.
+- **Artifacts:** `joblib` files are loaded only if produced by this system ([ADR 0002](docs/ADR/0002-trusted-joblib-artifacts.md)).
+
+## 5. Commands
+No command has been verified, because no tooling exists yet. Do not invent commands. When you add tooling, record the **verified** commands here:
+
+| Task | Command |
+|---|---|
+| Install | TBD |
+| Lint / format | TBD |
+| Type-check | TBD |
+| Test | TBD |
+| Build | TBD |
+| Run locally | TBD |
+
+## 6. Adding features
+1. Find the requirement ID in [docs/PRD.md](docs/PRD.md) (or add one with acceptance criteria).
+2. Check the milestone dependencies in [docs/ROADMAP.md](docs/ROADMAP.md).
+3. Write or update tests first for engine and API behaviour.
+4. Implement behind the adapter boundaries (storage, jobs, monitoring).
+5. Update API spec / schema / design docs in the same change; mark items Implemented only when verified.
+6. Database changes require a migration plus a clean-database test.
+
+## 7. Security and secrets
+- Never commit secrets, keys, tokens, `.env` files, Terraform state or real datasets. Use variable **names** only in docs and `.env.example`.
+- Treat uploaded files as untrusted. Enforce size/row/column limits and ownership checks.
+- Do not log raw dataset rows, tokens or credentials. Do not return stack traces, storage keys or dataset values in API errors.
+- Prefer IAM roles / temporary credentials; scope permissions per component.
+
+## 8. Dependencies and API changes
+- Add dependencies only with a stated reason; pin via lockfiles; run dependency scans once CI exists.
+- Do not change public API routes or response shapes without updating [docs/API_SPEC.md](docs/API_SPEC.md) and versioning appropriately.
+
+## 9. Prohibited actions
+- No force-push, history rewriting, branch deletion (other than a merged feature branch you created), or bypassing hooks and branch protection.
+- No destructive filesystem or cloud operations (deleting buckets, `terraform destroy`, mass deletes) without explicit instruction from the maintainer.
+- No creation of AWS resources, and no changes that can incur cost, without explicit instruction and a cost check ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- Do not execute code from uploaded datasets or user configuration.
+
+## 10. Documentation policy
+Behaviour changes update the relevant doc in the same PR. Keep [docs/README.md](docs/README.md) links working. Keep status labels (Implemented / Proposed / Assumption / Open) accurate. No unresolved template tokens.
+
+## 11. Definition of done for a change
+Tests added/updated and passing, lint and type checks passing (once defined), docs updated, no secrets in the diff, scope limited to the task, and the verified commands you ran are stated in the PR description.
+
+## 12. Git protocol
+- Work on a feature branch, never directly on `main`. Branch names such as `docs/...`, `feat/...`, `fix/...`.
+- Stage explicit paths only (`git add <paths>`); do not use `git add .` or `git add -A`. Leave unrelated pre-existing changes untouched.
+- Commit messages: short imperative subject with a conventional prefix (`docs:`, `feat:`, `fix:`, `chore:`, `test:`).
+- Push the branch with a normal push and open a pull request into `main`. Merge only when the PR is mergeable and required checks (once they exist) pass.
+
+## 13. Authorship and attribution (maintainer requirement)
+The only approved maintainer and contributor identity for project metadata, documentation and commits is **ChamathDilshanC**.
+- Do **not** add AI assistants, language models, tools, bots or services as authors, contributors or maintainers.
+- Do **not** add `Co-authored-by:` / `Co-Authored-By:` trailers, "generated by" badges or footers, or tool attribution in commits, PR text, changelogs, file headers or docs.
+- Commits use the repository-local Git identity `user.name = ChamathDilshanC` with an owner-verified email. Never guess or borrow an email; ask if it is missing. Do not change global Git config.
+- Do not rewrite existing history to alter authorship.
