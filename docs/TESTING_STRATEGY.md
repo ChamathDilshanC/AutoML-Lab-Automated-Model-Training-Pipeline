@@ -1,6 +1,6 @@
 # Testing Strategy
 
-> **Status:** **Proposed.** No tests, fixtures or CI exist yet. Commands and tool names are **TBD** until the stack is scaffolded.
+> **Status:** CI and a first set of tests exist (`backend/tests/`: health, config, database, ML engine, `automl` import-independence). ML tests build small seeded data in-code instead of reading fixture files. Everything else below is **Proposed**. Verified commands are in [AGENTS.md § 5](../AGENTS.md#5-commands).
 
 Related: [PRD](PRD.md) · [Architecture § 13](ARCHITECTURE.md#13-test-architecture) · [Deployment § 5](DEPLOYMENT.md#5-cicd-proposed)
 

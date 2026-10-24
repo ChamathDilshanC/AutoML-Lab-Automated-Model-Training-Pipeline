@@ -13,6 +13,8 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "sqlalchemy>=2.0",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
 ]
 
 [project.optional-dependencies]
@@ -41,3 +43,7 @@ python_version = "3.11"
 check_untyped_defs = true
 warn_unused_ignores = true
 packages = ["app", "automl", "worker"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "pandas.*"]
+ignore_missing_imports = true

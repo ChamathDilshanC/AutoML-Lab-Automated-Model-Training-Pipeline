@@ -12,11 +12,21 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 |---|---|
 | Frontend | **Implemented (M1):** Next.js App Router shell with a backend health indicator (`frontend/`) |
 | Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). No routes under `/api/v1` yet, no metadata tables |
-| ML engine | **Stubs only (M1):** `backend/automl/` modules exist as empty docstring files |
+| ML engine | **Implemented (M3):** `backend/automl/` provides dataset and target validation, a `ColumnTransformer` preprocessor, stratified/random splits, the algorithm allowlist with train-only grid search, held-out evaluation, and metric-aware ranking. It is not yet wired to the API or worker. `registry.py` is still a stub (M5) |
 | Worker | **Stub (M1):** `backend/worker/main.py` logs and exits |
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
 | CI | **Implemented (M1):** `.github/workflows/ci.yml` runs backend lint/format/type/test and frontend lint/type/build |
 | Local run | `docker-compose.yml` defined; not yet run |
+
+Engine functions (all in `backend/automl/`):
+
+| Module | Public functions |
+|---|---|
+| `validation.py` | `validate_headers`, `validate_dataframe`, `validate_target`, `ValidationLimits`, `DataValidationError` |
+| `preprocessing.py` | `split_column_types`, `build_preprocessor` (unfitted; fitted inside the training pipeline) |
+| `splits.py` | `separate_target`, `split_data` returning a `DataSplit` that records strategy, test size and seed |
+| `trainer.py` | `ESTIMATORS` allowlist, `available_algorithms`, `train_model` returning a `TrainedModel` (pipeline, best parameters, CV score, feature names, library versions) |
+| `evaluator.py` | `METRICS` with direction, `evaluate`, `rank_results`, `scoring_for` |
 
 Everything else in this document is the target design.
 
