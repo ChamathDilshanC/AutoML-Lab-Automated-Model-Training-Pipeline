@@ -166,7 +166,7 @@ def test_dataset_must_be_ready(client: TestClient) -> None:
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "STATE_CONFLICT"
 
-    rejected = upload_dataset(client, b"")
+    rejected = upload_dataset(client, b"\n")
     client.post(f"/api/v1/datasets/{rejected}/validate")
     assert create(client, classification_payload(rejected)).status_code == 409
 

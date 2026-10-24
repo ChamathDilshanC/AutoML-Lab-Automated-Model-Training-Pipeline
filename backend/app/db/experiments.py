@@ -6,7 +6,7 @@ Used by both the API and the worker process, so it must not import web-framework
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.time import utc_now
@@ -57,11 +57,33 @@ def add_run(session: Session, **fields: Any) -> ExperimentRun:
     return run
 
 
-def claim_next_queued(session: Session) -> Experiment | None:
-    """Atomically move the oldest `QUEUED` experiment to `RUNNING` and return it.
+def claim_experiment(session: Session, experiment_id: str) -> Experiment | None:
+    """Atomically move one `QUEUED` experiment to `RUNNING` and return it.
 
-    The conditional UPDATE means that when several workers race for a job, exactly one wins.
+    Returns `None` if it is not queued any more (already claimed, finished, reaped or deleted).
+    The conditional UPDATE means that when several workers, or several deliveries of the same
+    queue message, race for a job, exactly one wins.
     """
+    result = session.execute(
+        update(Experiment)
+        .where(
+            Experiment.experiment_id == experiment_id,
+            Experiment.status == ExperimentStatus.QUEUED,
+        )
+        .values(status=ExperimentStatus.RUNNING, started_at=utc_now())
+    )
+    session.commit()
+    assert isinstance(result, CursorResult)
+    if result.rowcount != 1:
+        return None
+    experiment = session.get(Experiment, experiment_id)
+    if experiment is not None:
+        session.refresh(experiment)
+    return experiment
+
+
+def claim_next_queued(session: Session) -> Experiment | None:
+    """Claim the oldest `QUEUED` experiment (the database is the queue in `db` job mode)."""
     for _ in range(3):
         candidate = session.scalar(
             select(Experiment.experiment_id)
@@ -71,22 +93,16 @@ def claim_next_queued(session: Session) -> Experiment | None:
         )
         if candidate is None:
             return None
-        result = session.execute(
-            update(Experiment)
-            .where(
-                Experiment.experiment_id == candidate,
-                Experiment.status == ExperimentStatus.QUEUED,
-            )
-            .values(status=ExperimentStatus.RUNNING, started_at=utc_now())
-        )
-        session.commit()
-        assert isinstance(result, CursorResult)
-        if result.rowcount == 1:
-            experiment = session.get(Experiment, candidate)
-            if experiment is not None:
-                session.refresh(experiment)
+        experiment = claim_experiment(session, candidate)
+        if experiment is not None:
             return experiment
     return None
+
+
+def delete_experiment(session: Session, experiment_id: str) -> None:
+    """Remove an experiment that never started (used to undo a failed queue hand-off)."""
+    session.execute(delete(Experiment).where(Experiment.experiment_id == experiment_id))
+    session.commit()
 
 
 def finish_experiment(

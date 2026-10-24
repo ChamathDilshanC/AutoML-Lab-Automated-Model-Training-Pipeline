@@ -17,6 +17,7 @@ from app.core.request_id import RequestIdMiddleware
 from app.core.tokens import resolve_secret_key
 from app.db import models  # noqa: F401  (registers tables on Base.metadata)
 from app.db.session import Base, SessionLocal, engine
+from app.services.aws import build_publisher, build_storage
 from app.services.reaper import run_reaper
 
 
@@ -45,6 +46,8 @@ def create_app() -> FastAPI:
     resolve_secret_key(settings)  # fail at start-up, not on the first sign-in, if misconfigured
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    app.state.storage = build_storage(settings)
+    app.state.publisher = build_publisher(settings)
     app.state.predict_limiter = RateLimiter(settings.predict_rate_limit_per_minute)
     app.state.login_limiter = RateLimiter(settings.login_rate_limit_per_minute)
     register_exception_handlers(app)
@@ -55,7 +58,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
         expose_headers=["X-Request-ID", "Retry-After"],
     )

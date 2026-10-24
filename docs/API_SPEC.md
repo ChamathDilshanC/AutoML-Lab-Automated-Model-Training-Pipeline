@@ -72,25 +72,42 @@ There is no public sign-up; accounts are created with `python -m app.cli create-
 
 Tokens are signed JWTs (HS256), valid for 60 minutes by default. The user is looked up on every request, so disabling or deleting an account ends its tokens immediately. There are no refresh tokens and no server-side logout.
 
-### 4.1 Dataset routes (**Implemented**, M2)
-In local mode the file goes through the backend. A presigned direct-to-S3 upload (the original `PENDING_UPLOAD` flow) is deferred to the AWS milestone (M6).
+### 4.1 Dataset routes (**Implemented**, M2, reworked in M6)
+Uploading is three calls: register, send the bytes, validate. The same sequence is used with local storage and with S3 ([ADR 0005](ADR/0005-s3-storage-and-sqs-job-queue.md)).
 
-**`POST /api/v1/datasets`** — `multipart/form-data` with one `file` field (`.csv` only).
-- `201` with a dataset: `{ dataset_id, original_filename, size_bytes, status: "UPLOADED", created_at, validation: null }`. `created_at` is UTC. Storage keys are never returned.
-- `413 PAYLOAD_TOO_LARGE` above `MAX_UPLOAD_BYTES` (default 10 MiB, **proposed**). A declared `Content-Length` far above the limit is refused up front; otherwise the cap is enforced while the file is written, and the partial file is deleted.
-- `422 VALIDATION_ERROR` for a missing `file` field or a non-`.csv` name. The client filename is sanitised for display and never used as a storage path.
+**`POST /api/v1/datasets`** with JSON `{ "filename": "housing.csv", "size_bytes": 1048576 }` registers a dataset and returns `201`:
+```json
+{
+  "dataset_id": "ds_...", "original_filename": "housing.csv", "size_bytes": 1048576,
+  "status": "PENDING_UPLOAD", "created_at": "...Z", "validation": null,
+  "upload": {
+    "method": "PUT",
+    "url": "https://<bucket>.s3.<region>.amazonaws.com/datasets/...?X-Amz-...",
+    "headers": { "Content-Type": "text/csv" },
+    "expires_in_seconds": 300,
+    "requires_auth": false
+  }
+}
+```
+- `STORAGE_MODE=s3`: `url` is a presigned S3 URL for that one key, valid for 300 seconds (`S3_PRESIGN_EXPIRES_SECONDS`). `Content-Type` and the exact `Content-Length` are signed, so S3 refuses any other size or type. `requires_auth` is `false`: send **no** `Authorization` header to it.
+- `STORAGE_MODE=local`: `url` is `/api/v1/datasets/{id}/content` on this API and `requires_auth` is `true`.
+- `413 PAYLOAD_TOO_LARGE` if `size_bytes` exceeds `MAX_UPLOAD_BYTES` (default 10 MiB, **proposed**); no URL is issued. `422 VALIDATION_ERROR` for a non-`.csv` name or a size below 1. The client filename is sanitised for display and never used as a storage path.
+
+**`PUT /api/v1/datasets/{dataset_id}/content`** (local mode only) takes the raw bytes. `204` on success. `413` if the body is larger than the declared size, `422` if it is smaller (nothing is kept either way), `409 STATE_CONFLICT` unless the dataset is `PENDING_UPLOAD`, or in S3 mode. The body-limit middleware also refuses, up front, a declared `Content-Length` far above the limit.
 
 **`POST /api/v1/datasets/{dataset_id}/validate`** — runs the CSV through the engine and returns the report: `{ status: "READY" | "REJECTED", row_count, column_count, columns: [{ name, kind, missing_count, missing_percent, unique_count }], warnings: [{ code, severity, message, columns }], message }`.
+- `409 STATE_CONFLICT` if no file has been uploaded yet (this is not a rejection: upload and call again).
+- The stored object's size must equal the declared size, whatever mechanism uploaded it; otherwise the dataset is `REJECTED` and the object is deleted.
 - A rejected file is a normal `200` with `status: "REJECTED"` and a safe `message`; its stored file is removed.
 - Repeating the call on an already-decided dataset returns the stored report.
 - Checks: UTF-8 text, a readable header, no empty/duplicate/ambiguous headers, consistent field counts, row/column limits (`ValidationLimits` defaults, **proposed**).
 - Warning codes: `tiny_dataset`, `constant_column`, `high_missing`, `identifier_like`, `high_cardinality`, `duplicate_rows`.
 
-**`GET /api/v1/datasets/{dataset_id}`** — dataset metadata with `validation` set once the dataset has been validated (`null` while `UPLOADED`).
+**`GET /api/v1/datasets/{dataset_id}`** — dataset metadata with `validation` set once the dataset has been validated (`null` while `PENDING_UPLOAD`).
 
 **`DELETE /api/v1/datasets/{dataset_id}`** (M7) returns `204` after deleting the dataset and everything derived from it: its experiments, runs and models, and the stored files (source CSV and model artifacts). Database rows are removed first in one transaction; file removal follows, and a failure there is logged but does not fail the request (the files are then unreachable, not referenced). `409 STATE_CONFLICT` while one of its experiments is `RUNNING`. Deleting twice gives `404`.
 
-Dataset statuses: `UPLOADED` (stored, not validated), `READY`, `REJECTED`. Unknown or other owners' datasets return `404 NOT_FOUND`.
+Dataset statuses: `PENDING_UPLOAD` (registered, not validated), `READY`, `REJECTED`. `UPLOADED` is a legacy value on rows created before M6 and is treated like `PENDING_UPLOAD`. Unknown or other owners' datasets return `404 NOT_FOUND`.
 
 ### 4.2 Experiment routes (**Implemented**, M4)
 The API only queues work. A separate worker process trains the models (see [ARCHITECTURE § 6.6](ARCHITECTURE.md#66-job-orchestration)), so no request waits for training.
@@ -110,7 +127,7 @@ The API only queues work. A separate worker process trains the models (see [ARCH
 }
 ```
 - `metric` is optional (default `f1` for classification, `rmse` for regression). `random_seed` defaults to 42 and `test_size` to 0.2 (allowed 0.05 to 0.5). Duplicate algorithms are collapsed in order.
-- Returns `202` with the experiment, `status: "QUEUED"`.
+- Returns `202` with the experiment, `status: "QUEUED"`. With `JOB_MODE=sqs` the API also sends `{"experiment_id": "...", "version": 1}` to the queue; the message carries only the ID, and the configuration always comes from the database. If the queue cannot be reached the experiment is removed again and the answer is `503 SERVICE_UNAVAILABLE` with `Retry-After: 5`, so retrying (also with the same `Idempotency-Key`) is safe.
 - `404` for an unknown or foreign dataset; `409 STATE_CONFLICT` unless the dataset is `READY`.
 - `422 VALIDATION_ERROR` with `details` naming the field: the target is not in the dataset, has missing values, has fewer than two distinct values, or is not numeric for regression; the metric does not fit the task; an algorithm is not on the allowlist. Checks that need the data itself (for example a class with a single row) happen in the worker, which fails the experiment with a safe message.
 - Optional `Idempotency-Key` header (up to 128 characters): repeating a request with the same key and owner returns the first experiment instead of creating another. The body of a repeated request is not compared. The browser sends this header, so the CORS configuration allows it.

@@ -1,7 +1,8 @@
 """Training worker entry point: `python -m worker.main`.
 
-A separate process from the API. It polls the metadata database for `QUEUED` experiments and runs
-them, so training never depends on an open web request.
+A separate process from the API, so training never depends on an open web request. In `db` job mode
+it polls the metadata database for `QUEUED` experiments; in `sqs` mode it long-polls the queue
+(docs/ADR/0005).
 """
 
 import argparse
@@ -9,14 +10,18 @@ import logging
 import signal
 import threading
 from collections.abc import Sequence
-from pathlib import Path
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
-from app.services.storage import LocalStorage
-from worker.jobs import process_next, run_loop
+from app.services.aws import build_queue, build_storage
+from worker.jobs import process_message, process_next, run_loop, run_sqs_loop
 
 logger = logging.getLogger("worker")
+
+
+def _stop_on_signals(stop: threading.Event) -> None:
+    for name in ("SIGINT", "SIGTERM"):
+        signal.signal(getattr(signal, name), lambda *_: stop.set())
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -32,8 +37,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Safe to repeat: lets the worker start before the API has created the tables.
     Base.metadata.create_all(engine)
 
-    storage = LocalStorage(Path(settings.artifact_dir))
+    storage = build_storage(settings)
     poll_seconds = args.poll_seconds or settings.worker_poll_seconds
+
+    if settings.job_mode == "sqs":
+        queue = build_queue(settings)
+        if args.once:
+            message = queue.receive()
+            if message is not None:
+                process_message(
+                    SessionLocal,
+                    storage,
+                    queue,
+                    message,
+                    max_artifact_bytes=settings.max_artifact_bytes,
+                )
+            return 0
+        stop = threading.Event()
+        _stop_on_signals(stop)
+        logger.info("Worker started; long-polling the SQS queue")
+        run_sqs_loop(
+            SessionLocal,
+            storage,
+            queue,
+            job_timeout_seconds=settings.job_timeout_seconds,
+            max_artifact_bytes=settings.max_artifact_bytes,
+            should_stop=stop.is_set,
+            on_error_sleep=stop.wait,
+        )
+        logger.info("Worker stopped")
+        return 0
 
     if args.once:
         process_next(
@@ -45,8 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     stop = threading.Event()
-    for name in ("SIGINT", "SIGTERM"):
-        signal.signal(getattr(signal, name), lambda *_: stop.set())
+    _stop_on_signals(stop)
 
     logger.info("Worker started; polling every %.1fs", poll_seconds)
     run_loop(

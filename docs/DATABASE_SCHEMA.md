@@ -38,11 +38,11 @@ erDiagram
 | `size_bytes` | Measured, not just declared |
 | `row_count`, `column_count` | Set on validation |
 | `schema_summary` | JSON: column names, inferred types, missing counts |
-| `validation_status` | `PENDING_UPLOAD`, `READY`, `REJECTED` (names Proposed) |
+| `validation_status` | `PENDING_UPLOAD`, `READY`, `REJECTED` (implemented as the `status` column) |
 | `validation_message` | Safe, non-leaky reason |
 | `created_at` | Timestamp |
 
-**Implemented columns (M2):** `dataset_id` (PK, `ds_` + random hex), `owner_id` (indexed; a fixed placeholder `local-user` until authentication in M7), `storage_key`, `original_filename` (sanitised), `size_bytes`, `status` (`UPLOADED`, `READY`, `REJECTED`; `PENDING_UPLOAD` is reserved for the presigned-upload flow), `row_count`, `column_count`, `schema_summary` (JSON list of column summaries), `quality_warnings` (JSON list), `validation_message`, `created_at` (naive UTC). `validation_status` above corresponds to `status`.
+**Implemented columns (M2):** `dataset_id` (PK, `ds_` + random hex), `owner_id` (indexed; a fixed placeholder `local-user` until authentication in M7), `storage_key`, `original_filename` (sanitised), `size_bytes`, `status` (`PENDING_UPLOAD`, `READY`, `REJECTED`; `UPLOADED` is a legacy value from before M6 and is treated as `PENDING_UPLOAD`), `row_count`, `column_count`, `schema_summary` (JSON list of column summaries), `quality_warnings` (JSON list), `validation_message`, `created_at` (naive UTC). `validation_status` above corresponds to `status`.
 
 ### 3.2 Experiment
 | Field | Notes |

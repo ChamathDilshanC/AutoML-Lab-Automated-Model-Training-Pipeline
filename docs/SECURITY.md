@@ -111,3 +111,21 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - Audit events are write-only: nothing reads them, there is no retention policy, and a sign-in failure stores the attempted username.
 - Deleting a dataset removes files after the database commit; a failure there leaves unreachable files rather than failing the request.
 - Single models cannot be deleted on their own; deleting the dataset removes them.
+
+## 16. Implemented so far (M6, cloud mode)
+Everything below applies only with `STORAGE_MODE=s3` or `JOB_MODE=sqs`; local mode is unchanged. None of it has run against a real AWS account (see [ADR 0005](ADR/0005-s3-storage-and-sqs-job-queue.md)).
+
+- **No AWS credentials in the code, the frontend or the repository.** The backend uses the standard AWS credential chain; Terraform creates IAM policies only, never users or access keys.
+- **Direct uploads without handing out credentials.** The browser receives a presigned `PUT` URL valid for 300 seconds, for one key, with the content type and exact length signed. The bearer token is never sent to it (checked in a real browser). The declared size is capped before a URL is issued, and validation independently re-checks the stored size and deletes a mismatching object.
+- **Least privilege per runtime.** The API can send job messages but not receive them; the worker can receive and delete them but not send; the worker can only read datasets, and write and delete models. No wildcard action or resource. A test records every AWS call of a full run and fails if one is not granted, or if a policy grants more than the code can use.
+- **Bucket and queue.** Block Public Access, owner-enforced ownership, encryption at rest, TLS-only policies, CORS limited to the configured origin and to `PUT`, `GET`, `HEAD` and `Content-Type`. Versioning is off, so deletion is real.
+- **Queue messages are untrusted hints.** A message holds only an experiment ID, strictly shape-checked; the configuration comes from the database, so a forged message cannot change what runs. A message for an unknown, running or finished experiment is dropped. Bad messages are deleted, not retried. If the database fails, the message is kept and later dead-lettered.
+- **Provider errors never leak.** Storage failures are reported with fixed messages (they can contain bucket and key names); queue failures return a generic `503`.
+- **Prefix deletion cannot over-reach.** Deleting `models/md_1` does not touch `models/md_10`, because the prefix always ends in a slash (tested).
+
+**Not verified or not done**
+- Real S3 enforcement of the signed `Content-Length`, real CORS behaviour, IAM evaluation, and `terraform apply` have not been exercised.
+- The sign-in and prediction rate limits are still in memory per process.
+- Unvalidated uploads (a registered dataset whose file never arrives) leave a database row until the user deletes it; there is no expiry job.
+- No bucket versioning, replication, access logging, or CloudTrail data events; no CloudWatch alarms.
+- The IAM policies do not restrict by source IP or VPC endpoint.

@@ -8,10 +8,12 @@ import type {
   ExperimentOptions,
   FeatureValue,
   CurrentUser,
+  DatasetUpload,
   Leaderboard,
   PredictionResponse,
   RegisteredModel,
   TokenResponse,
+  UploadTarget,
   ValidationReport,
 } from "@/lib/types";
 
@@ -154,30 +156,58 @@ export function predict(
   });
 }
 
-/** Upload with progress reporting (fetch cannot report upload progress). */
-export function uploadDataset(
+/** Step 1: tell the API about the file and get the target to send its bytes to. */
+export function registerDataset(file: File): Promise<DatasetUpload> {
+  return request<DatasetUpload>("/api/v1/datasets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, size_bytes: file.size }),
+  });
+}
+
+/**
+ * Step 2: send the file to the target, with progress (fetch cannot report upload progress).
+ *
+ * A presigned storage URL is signed for exactly these headers and must not get the bearer token,
+ * which would both break the signature and hand a credential to another host. Only a target on
+ * this API (`requires_auth`) receives it.
+ */
+export function sendFile(
+  target: UploadTarget,
   file: File,
   onProgress?: (fraction: number) => void,
-): Promise<Dataset> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE_URL}/api/v1/datasets`);
+    xhr.open(target.method, target.requires_auth ? `${API_BASE_URL}${target.url}` : target.url);
+    for (const [name, value] of Object.entries(target.headers)) xhr.setRequestHeader(name, value);
+    if (target.requires_auth) {
+      const token = getToken();
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress?.(event.loaded / event.total);
     };
-    xhr.onerror = () => reject(new ApiRequestError("Could not reach the server.", 0));
+    xhr.onerror = () =>
+      reject(
+        new ApiRequestError(
+          target.requires_auth
+            ? "Could not reach the server."
+            : "The upload could not be sent to storage. Check your connection and the bucket's CORS settings.",
+          0,
+        ),
+      );
     xhr.onload = () => {
-      if (xhr.status === 401) clearToken();
-      if (xhr.status === 201) {
-        resolve(JSON.parse(xhr.responseText) as Dataset);
-      } else {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else if (target.requires_auth) {
+        if (xhr.status === 401) clearToken();
         reject(toError(xhr.status, xhr.responseText));
+      } else {
+        // Storage answers in XML that can name the bucket; show a fixed message instead.
+        reject(new ApiRequestError(`Storage refused the upload (status ${xhr.status}).`, xhr.status));
       }
     };
-    const token = getToken();
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    const form = new FormData();
-    form.append("file", file);
-    xhr.send(form);
+    xhr.send(file);
   });
 }

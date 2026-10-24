@@ -1,4 +1,4 @@
-export type DatasetStatus = "UPLOADED" | "READY" | "REJECTED";
+export type DatasetStatus = "PENDING_UPLOAD" | "UPLOADED" | "READY" | "REJECTED";
 
 export interface ColumnSummary {
   name: string;
@@ -168,4 +168,17 @@ export interface TokenResponse {
 export interface CurrentUser {
   user_id: string;
   username: string;
+}
+
+/** Where to send a file's bytes: this API (local mode) or a presigned storage URL (S3 mode). */
+export interface UploadTarget {
+  method: string;
+  url: string; // a path on this API when requires_auth is true, otherwise absolute
+  headers: Record<string, string>;
+  expires_in_seconds: number | null;
+  requires_auth: boolean; // send the bearer token only when true
+}
+
+export interface DatasetUpload extends Dataset {
+  upload: UploadTarget;
 }

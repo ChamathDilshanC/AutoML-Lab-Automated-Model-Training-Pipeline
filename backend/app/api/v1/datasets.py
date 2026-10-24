@@ -1,6 +1,8 @@
-from typing import Annotated
+import tempfile
+from typing import Annotated, BinaryIO, cast
 
-from fastapi import APIRouter, Depends, Response, UploadFile
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_storage
@@ -11,7 +13,13 @@ from app.db.audit import record_audit
 from app.db.datasets import get_dataset
 from app.db.models import Dataset
 from app.db.session import get_session
-from app.schemas.datasets import DatasetResponse, ValidationReport
+from app.schemas.datasets import (
+    DatasetRegister,
+    DatasetResponse,
+    DatasetStatus,
+    DatasetUploadResponse,
+    ValidationReport,
+)
 from app.services import datasets as dataset_service
 from app.services.storage import StorageAdapter
 
@@ -30,30 +38,83 @@ def _owned_dataset(session: Session, owner_id: str, dataset_id: str) -> Dataset:
     return dataset
 
 
-@router.post("", response_model=DatasetResponse, status_code=201)
-def upload_dataset(
-    file: UploadFile,
+@router.post("", response_model=DatasetUploadResponse, status_code=201)
+def register_dataset(
+    payload: DatasetRegister,
     session: SessionDep,
     storage: StorageDep,
     owner_id: OwnerDep,
     settings: SettingsDep,
-) -> DatasetResponse:
-    """Upload a CSV file. The dataset is stored as `UPLOADED` until it is validated."""
-    dataset = dataset_service.create_from_upload(
-        session, storage, owner_id, file.filename, file.file, settings.max_upload_bytes
+) -> DatasetUploadResponse:
+    """Register a CSV and get a target to upload its bytes to.
+
+    With S3 the target is a short-lived presigned URL (the browser uploads straight to storage);
+    locally it is `PUT /api/v1/datasets/{id}/content` on this API. Either way the next step is
+    `POST /api/v1/datasets/{id}/validate`.
+    """
+    dataset, target = dataset_service.register_dataset(
+        session,
+        storage,
+        owner_id,
+        payload.filename,
+        payload.size_bytes,
+        settings.max_upload_bytes,
     )
-    return dataset_service.to_response(dataset)
+    return dataset_service.to_upload_response(dataset, target)
+
+
+@router.put("/{dataset_id}/content", status_code=204)
+async def upload_content(
+    dataset_id: str,
+    request: Request,
+    session: SessionDep,
+    storage: StorageDep,
+    owner_id: OwnerDep,
+    settings: SettingsDep,
+) -> Response:
+    """Local-storage upload target. Not used when files go straight to S3."""
+    dataset = _owned_dataset(session, owner_id, dataset_id)
+    if settings.storage_mode != "local":
+        raise ApiError(409, "STATE_CONFLICT", "Files are uploaded directly to storage.")
+    if dataset.status != DatasetStatus.PENDING_UPLOAD:
+        raise ApiError(409, "STATE_CONFLICT", "This dataset is not waiting for its file.")
+
+    declared = dataset.size_bytes
+    announced = request.headers.get("content-length", "")
+    if announced.isdigit() and int(announced) > declared:
+        raise ApiError(413, "PAYLOAD_TOO_LARGE", "The file is larger than its declared size.")
+
+    with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as spool:
+        received = 0
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > declared:
+                raise ApiError(
+                    413, "PAYLOAD_TOO_LARGE", "The file is larger than its declared size."
+                )
+            spool.write(chunk)
+        spool.seek(0)
+        await run_in_threadpool(
+            dataset_service.store_content, storage, dataset, cast(BinaryIO, spool)
+        )
+    return Response(status_code=204)
 
 
 @router.post("/{dataset_id}/validate", response_model=ValidationReport)
 def validate_dataset(
-    dataset_id: str, session: SessionDep, storage: StorageDep, owner_id: OwnerDep
+    dataset_id: str,
+    session: SessionDep,
+    storage: StorageDep,
+    owner_id: OwnerDep,
+    settings: SettingsDep,
 ) -> ValidationReport:
     """Validate the uploaded file and return the data-quality report (`READY` or `REJECTED`)."""
     dataset = _owned_dataset(session, owner_id, dataset_id)
-    dataset = dataset_service.validate_dataset(session, storage, dataset)
+    dataset = dataset_service.validate_dataset(
+        session, storage, dataset, max_bytes=settings.max_upload_bytes
+    )
     report = dataset_service.to_report(dataset)
-    assert report is not None  # a validated dataset is never UPLOADED
+    assert report is not None  # a validated dataset is never waiting for its file
     return report
 
 

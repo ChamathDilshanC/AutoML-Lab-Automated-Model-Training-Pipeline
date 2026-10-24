@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 to M5 and M7 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction, security and reliability).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker, a leaderboard, a model registry with approval and revocation, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite, behind sign-in with per-user ownership, rate limits, dataset deletion and an abandoned-job reaper. Cloud deployment (M6, M8) is **not implemented**, and neither are password reset, MFA or server-side logout (see `docs/SECURITY.md` § 15). Check the tree before assuming anything else exists.
+**Current state: M1 to M5 and M7 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction, security and reliability).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker, a leaderboard, a model registry with approval and revocation, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite, behind sign-in with per-user ownership, rate limits, dataset deletion and an abandoned-job reaper. Cloud mode (M6: S3 with presigned uploads, an SQS queue, Terraform) is implemented but **has never been run against a real AWS account**; hosting, EventBridge, CloudWatch and deployment (M8) are not implemented, and neither are password reset, MFA or server-side logout (see `docs/SECURITY.md` § 15). Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).
@@ -45,7 +45,8 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 | Backend test | `pytest` | `backend/` |
 | Create a user (no public sign-up) | `python -m app.cli create-user <name>` | `backend/` |
 | Backend run | `uvicorn app.main:app --reload` | `backend/` |
-| Worker run (second terminal) | `python -m worker.main` (`--once` processes at most one job) | `backend/` |
+| Worker run (second terminal) | `python -m worker.main` (`--once` processes at most one job; with `JOB_MODE=sqs` it long-polls the queue) | `backend/` |
+| Terraform checks (CI only, Terraform is not required locally) | `terraform fmt -check`, `init -backend=false`, `validate` in `infrastructure/terraform/` | CI |
 | Frontend install | `npm ci` | `frontend/` |
 | Frontend lint | `npm run lint` | `frontend/` |
 | Frontend type-check | `npm run typecheck` | `frontend/` |
@@ -69,6 +70,9 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 - Prefer IAM roles / temporary credentials; scope permissions per component.
 - **Every `/api/v1` route needs a signed-in user.** Add new routers under `protected` in `backend/app/api/v1/router.py`; the route-walk test in `tests/test_auth.py` fails if one is left open. Take the owner from `get_owner_id`, filter every query by it, and return `404` (never `403`) for another user's ID.
 - `SECRET_KEY` is never committed or logged. Never log passwords, tokens or request bodies, and keep audit details free of secrets.
+- **Never call AWS from code that tests or developers run by default.** `STORAGE_MODE=local` and `JOB_MODE=db` are the defaults; AWS tests use `moto`. Do not run `terraform apply`, `aws` commands that create or change resources, or anything that uses the user's AWS credentials unless the user explicitly asks. Do not add AWS access keys anywhere.
+- A new AWS call must be added to the IAM policy in `infrastructure/terraform/iam.tf` and to the operation map in `backend/tests/test_aws.py`; that test fails otherwise, and also if a policy grants more than the code uses.
+- Use the app's own client factory (`app/services/aws.py`) in tests, not a plain `boto3.client`: it sets SigV4 and regional addressing, which a plain client does not.
 - Security tests must use real tokens. Do not add an authentication bypass to fixtures or an environment switch that disables checks.
 
 ## 8. Dependencies and API changes

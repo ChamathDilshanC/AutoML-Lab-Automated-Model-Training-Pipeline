@@ -7,7 +7,7 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Milestones M1 to M5 are in place: upload a CSV, review its data-quality report, configure an experiment, watch a separate worker train the candidate models and rank them on a leaderboard, then approve the winning model and get predictions from it in the browser or over the API. Sign-in with per-user ownership, dataset deletion, model revocation and rate limiting (M7) are in place; cloud deployment is not. See the [roadmap](docs/ROADMAP.md).
+Milestones M1 to M5 are in place: upload a CSV, review its data-quality report, configure an experiment, watch a separate worker train the candidate models and rank them on a leaderboard, then approve the winning model and get predictions from it in the browser or over the API. Sign-in with per-user ownership, dataset deletion, model revocation and rate limiting (M7) are in place; hosting and deployment are not. Cloud mode (S3 with direct uploads and an SQS queue, defined in Terraform) is implemented but has never been run against a real AWS account; it is off by default. See the [roadmap](docs/ROADMAP.md) and [infrastructure/terraform/README.md](infrastructure/terraform/README.md).
 
 ## Quick start (local)
 ```bash

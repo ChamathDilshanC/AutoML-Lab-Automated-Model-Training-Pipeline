@@ -232,6 +232,32 @@ def test_cors_allows_the_authorization_header_and_delete(client: TestClient) -> 
     assert "authorization" in response.headers["access-control-allow-headers"].lower()
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "headers"),
+    [
+        ("PUT", "/api/v1/datasets/ds_x/content", "authorization,content-type"),
+        ("POST", "/api/v1/datasets", "authorization,content-type"),
+        ("POST", "/api/v1/experiments", "authorization,content-type,idempotency-key"),
+        ("DELETE", "/api/v1/datasets/ds_x", "authorization"),
+    ],
+)
+def test_browser_preflights_pass_for_every_call_the_frontend_makes(
+    client: TestClient, method: str, path: str, headers: str
+) -> None:
+    """A browser blocks a call unless the preflight allows its method and every header it sends.
+    TestClient never preflights, so this is the only thing that catches a missing entry."""
+    response = client.options(
+        path,
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers": headers,
+        },
+    )
+    assert response.status_code == 200, f"{method} {path}: {response.text}"
+    assert method in response.headers["access-control-allow-methods"]
+
+
 # --- token and secret handling ------------------------------------------------------------------
 
 

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_publisher
 from app.core.errors import ApiError
 from app.core.security import get_owner_id
 from app.db import experiments as repo
@@ -18,11 +19,13 @@ from app.schemas.experiments import (
     LeaderboardResponse,
 )
 from app.services import experiments as experiment_service
+from app.services.job_queue import JobPublisher, JobPublishError
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 SessionDep = Annotated[Session, Depends(get_session)]
 OwnerDep = Annotated[str, Depends(get_owner_id)]
+PublisherDep = Annotated[JobPublisher, Depends(get_publisher)]
 
 
 def _owned_experiment(session: Session, owner_id: str, experiment_id: str) -> Experiment:
@@ -44,15 +47,29 @@ def create_experiment(
     payload: ExperimentCreate,
     session: SessionDep,
     owner_id: OwnerDep,
+    publisher: PublisherDep,
     idempotency_key: Annotated[str | None, Header(max_length=128)] = None,
 ) -> ExperimentResponse:
     """Queue an experiment for the worker. Training does not happen in this request."""
     dataset = get_dataset(session, owner_id, payload.dataset_id)
     if dataset is None:
         raise ApiError(404, "NOT_FOUND", "Dataset not found.")
-    experiment = experiment_service.create_experiment(
+    experiment, created = experiment_service.create_experiment(
         session, owner_id, dataset, payload, idempotency_key
     )
+    if created:
+        try:
+            publisher.publish(experiment.experiment_id)
+        except JobPublishError:
+            # Nothing will ever run this experiment, so do not leave it queued. Removing it also
+            # frees the idempotency key, so the same request can simply be repeated.
+            repo.delete_experiment(session, experiment.experiment_id)
+            raise ApiError(
+                503,
+                "SERVICE_UNAVAILABLE",
+                "The job queue is unavailable. Please try again shortly.",
+                headers={"Retry-After": "5"},
+            ) from None
     return experiment_service.to_response(experiment)
 
 

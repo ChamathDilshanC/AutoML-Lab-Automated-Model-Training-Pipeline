@@ -40,7 +40,7 @@ export default function DataQualityReport({ dataset }: { dataset: Dataset }) {
       </header>
 
       {!report && (
-        <p className="text-muted">This file has been uploaded but not validated yet.</p>
+        <p className="text-muted">This file has not been validated yet. If the upload never finished, delete this dataset and upload the file again.</p>
       )}
 
       {report?.status === "REJECTED" && (

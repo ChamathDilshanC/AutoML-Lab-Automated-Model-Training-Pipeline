@@ -2,9 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { errorMessage, uploadDataset, validateDataset } from "@/lib/api";
+import {
+  deleteDataset,
+  errorMessage,
+  registerDataset,
+  sendFile,
+  validateDataset,
+} from "@/lib/api";
 
-type Phase = "idle" | "uploading" | "validating";
+type Phase = "idle" | "preparing" | "uploading" | "validating";
 
 export default function DatasetUploader() {
   const router = useRouter();
@@ -22,16 +28,26 @@ export default function DatasetUploader() {
       setError("Only .csv files are supported.");
       return;
     }
+    if (file.size === 0) {
+      setError("The file is empty.");
+      return;
+    }
+    let datasetId: string | null = null;
     try {
-      setPhase("uploading");
+      setPhase("preparing");
       setProgress(0);
-      const dataset = await uploadDataset(file, setProgress);
+      const registered = await registerDataset(file);
+      datasetId = registered.dataset_id;
+      setPhase("uploading");
+      await sendFile(registered.upload, file, setProgress);
       setPhase("validating");
-      await validateDataset(dataset.dataset_id);
-      router.push(`/datasets/${dataset.dataset_id}`);
+      await validateDataset(registered.dataset_id);
+      router.push(`/datasets/${registered.dataset_id}`);
     } catch (err) {
       setError(errorMessage(err));
       setPhase("idle");
+      // Do not leave a record that is waiting for a file that never arrived.
+      if (datasetId) void deleteDataset(datasetId).catch(() => undefined);
     }
   }
 
@@ -87,6 +103,7 @@ export default function DatasetUploader() {
             <span className="text-sm text-muted">Uploading… {Math.round(progress * 100)}%</span>
           </div>
         )}
+        {phase === "preparing" && <span className="text-sm text-muted">Preparing the upload…</span>}
         {phase === "validating" && <span className="text-sm text-muted">Validating the file…</span>}
       </div>
 
