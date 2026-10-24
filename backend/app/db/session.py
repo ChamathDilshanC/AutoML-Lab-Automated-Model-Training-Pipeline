@@ -8,7 +8,7 @@ from app.core.config import get_settings
 
 
 class Base(DeclarativeBase):
-    """Declarative base for metadata models (added in later milestones)."""
+    """Declarative base for metadata models."""
 
 
 def make_engine(database_url: str) -> Engine:
@@ -23,6 +23,10 @@ def make_engine(database_url: str) -> Engine:
         def _enable_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            # The API and the worker are separate processes sharing one file: WAL lets readers
+            # and a writer overlap, and the timeout waits for a lock instead of failing.
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
             cursor.close()
 
     return engine

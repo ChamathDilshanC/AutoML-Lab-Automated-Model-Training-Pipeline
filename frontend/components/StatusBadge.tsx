@@ -1,13 +1,20 @@
-import type { DatasetStatus } from "@/lib/types";
+import type { DatasetStatus, ExperimentStatus } from "@/lib/types";
 
-const STATUS: Record<DatasetStatus, { label: string; icon: string; color: string }> = {
+type BadgeStatus = DatasetStatus | ExperimentStatus;
+
+const STATUS: Record<BadgeStatus, { label: string; icon: string; color: string }> = {
   UPLOADED: { label: "Uploaded, not validated", icon: "●", color: "text-accent" },
   READY: { label: "Ready", icon: "✓", color: "text-success" },
   REJECTED: { label: "Rejected", icon: "✕", color: "text-danger" },
+  CREATED: { label: "Created", icon: "○", color: "text-accent" },
+  QUEUED: { label: "Queued", icon: "○", color: "text-accent" },
+  RUNNING: { label: "Running", icon: "◐", color: "text-accent" },
+  SUCCEEDED: { label: "Succeeded", icon: "✓", color: "text-success" },
+  FAILED: { label: "Failed", icon: "✕", color: "text-danger" },
 };
 
 /** Status is conveyed by text and icon as well as colour. */
-export default function StatusBadge({ status }: { status: DatasetStatus }) {
+export default function StatusBadge({ status }: { status: BadgeStatus }) {
   const { label, icon, color } = STATUS[status];
   return (
     <span

@@ -66,3 +66,10 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - Errors use one envelope with a request ID, never include stack traces, paths or cell values, and validation details name fields only.
 - Dataset reads are scoped to the owner and return `404` for foreign IDs. The owner is a fixed placeholder until authentication exists (M7), so this is not yet real access control.
 - Not implemented yet: authentication, rate limiting, malware scanning, retention and deletion.
+
+## 13. Implemented so far (M4)
+- Experiment configuration is validated against the stored schema and the algorithm allowlist; algorithm names are looked up in a table and never imported or evaluated.
+- Training runs in a separate worker process, never in a request. The worker records fixed, generic messages for unexpected failures and failed algorithms, because library error text can quote data; the full error goes to the worker log only.
+- Experiment reads are owner-scoped and return `404` for other owners' IDs (the owner is still a placeholder until M7).
+- `Idempotency-Key` prevents duplicate queued jobs from double submits. It is not a security control.
+- **Not implemented:** per-job CPU, memory or wall-clock limits. `JOB_TIMEOUT_SECONDS` only marks a `RUNNING` job `FAILED` after the fact; it cannot stop a training call that is stuck. A malicious or huge dataset can therefore still tie up the worker within the upload limits. Real limits need process isolation (for example a subprocess per job with resource limits), which is open work.

@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 Foundation, M2 Dataset workflow and M3 ML engine.** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload and validation work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). Experiments (API/worker orchestration), the model registry and prediction are **not implemented**. Check the tree before assuming anything else exists.
+**Current state: M1 to M4 (foundation, dataset workflow, ML engine, experiment management).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker and a leaderboard work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). The model registry and prediction are **not implemented**. Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).
@@ -20,7 +20,7 @@ If code and docs disagree, trust the code, then fix the docs in the same change.
 | `frontend/` | Next.js app | No AWS credentials; use tokens from the design system |
 | `backend/app/` | FastAPI service | Ownership checks on every resource; safe errors |
 | `backend/automl/` | ML engine | **Must not import AWS SDKs or web frameworks** |
-| `backend/worker/` | Job runner | Never executes user-supplied code |
+| `backend/worker/` | Job runner (`python -m worker.main`) | Never executes user-supplied code; must not import web-framework code (a test enforces it) |
 | `backend/tests/` | Tests | Deterministic fixtures, fixed seeds |
 | `infrastructure/terraform/` | IaC | No secrets, no committed state |
 | `docs/` | Documentation | Update with behaviour changes |
@@ -44,6 +44,7 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 | Backend type-check | `mypy` | `backend/` |
 | Backend test | `pytest` | `backend/` |
 | Backend run | `uvicorn app.main:app --reload` | `backend/` |
+| Worker run (second terminal) | `python -m worker.main` (`--once` processes at most one job) | `backend/` |
 | Frontend install | `npm ci` | `frontend/` |
 | Frontend lint | `npm run lint` | `frontend/` |
 | Frontend type-check | `npm run typecheck` | `frontend/` |
@@ -71,7 +72,7 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 - Do not change public API routes or response shapes without updating [docs/API_SPEC.md](docs/API_SPEC.md) and versioning appropriately.
 
 ## 9. Prohibited actions
-- No force-push, history rewriting, branch deletion (other than a merged feature branch you created), or bypassing hooks and branch protection.
+- No force-push, history rewriting, deleting `main` or any branch whose PR is not merged, or bypassing hooks and branch protection.
 - No destructive filesystem or cloud operations (deleting buckets, `terraform destroy`, mass deletes) without explicit instruction from the maintainer.
 - No creation of AWS resources, and no changes that can incur cost, without explicit instruction and a cost check ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 - Do not execute code from uploaded datasets or user configuration.
@@ -86,7 +87,8 @@ Tests added/updated and passing, lint and type checks passing (once defined), do
 - Work on a feature branch, never directly on `main`. Branch names such as `docs/...`, `feat/...`, `fix/...`.
 - Stage explicit paths only (`git add <paths>`); do not use `git add .` or `git add -A`. Leave unrelated pre-existing changes untouched.
 - Commit messages: short imperative subject with a conventional prefix (`docs:`, `feat:`, `fix:`, `chore:`, `test:`).
-- Push the branch with a normal push and open a pull request into `main`. Merge only when the PR is mergeable and required checks (once they exist) pass.
+- Push the branch with a normal push and open a pull request into `main`. `main` is protected: the `backend` and `frontend` CI checks must pass. Merge only when the PR is mergeable.
+- After a PR is merged, delete its feature branch on GitHub and locally (`gh pr merge --merge --delete-branch`, or `git push origin --delete <branch>` and `git branch -d <branch>`). Never delete a branch whose PR is not merged.
 
 ## 13. Authorship and attribution (maintainer requirement)
 The only approved maintainer and contributor identity for project metadata, documentation and commits is **ChamathDilshanC**.

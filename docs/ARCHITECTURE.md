@@ -10,10 +10,10 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 
 | Area | State |
 |---|---|
-| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), design tokens in `globals.css` (`frontend/`) |
-| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. No experiment or model routes yet |
+| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), `/experiments/new` (configuration form), `/experiments/[id]` (status polling and leaderboard), design tokens in `globals.css` (`frontend/`) |
+| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. **M4 adds:** experiment routes (`/api/v1/experiments`: options, create, read, results), the `experiments` and `experiment_runs` tables and idempotent submission. No model routes yet |
 | ML engine | **Implemented (M3):** `backend/automl/` provides dataset and target validation, a `ColumnTransformer` preprocessor, stratified/random splits, the algorithm allowlist with train-only grid search, held-out evaluation, and metric-aware ranking. It is not yet wired to the API or worker. `registry.py` is still a stub (M5) |
-| Worker | **Stub (M1):** `backend/worker/main.py` logs and exits |
+| Worker | **Implemented (M4):** `python -m worker.main` is a separate process. It polls the database, atomically claims `QUEUED` experiments one at a time, runs the engine, records each run and the outcome, and fails `RUNNING` jobs that exceed `JOB_TIMEOUT_SECONDS`. Any failure is recorded on the experiment and the loop continues. It imports no web-framework code (tested) |
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
 | CI | **Implemented (M1):** `.github/workflows/ci.yml` runs backend lint/format/type/test and frontend lint/type/build |
 | Local run | `docker-compose.yml` defined; not yet run |
@@ -28,6 +28,8 @@ Engine functions (all in `backend/automl/`):
 | `trainer.py` | `ESTIMATORS` allowlist, `available_algorithms`, `train_model` returning a `TrainedModel` (pipeline, best parameters, CV score, feature names, library versions) |
 | `evaluator.py` | `METRICS` with direction, `evaluate`, `rank_results`, `scoring_for` |
 | `quality.py` | `summarize_schema`, `quality_warnings` |
+
+Experiments record metrics, parameters and the split, but the worker does not persist fitted pipelines yet. How the registry (M5) obtains the winning model, by storing it at training time or by retraining deterministically from the recorded configuration, is **Open**.
 
 Everything else in this document is the target design.
 
@@ -153,7 +155,7 @@ Algorithm allowlist (Proposed): classification — Logistic Regression, Decision
 ### 6.6 Job orchestration
 | Mode | Mechanism | State |
 |---|---|---|
-| Local | Backend submits to a local worker queue | Proposed (first release) |
+| Local | The API writes a `QUEUED` experiment to the database; a separate worker process polls the table and claims jobs with a conditional update, so several workers cannot take the same job | **Implemented (M4)** |
 | Cloud | A durable queue pattern (SQS is a candidate) plus a worker runtime that is not Lambda for long jobs | **Open** |
 | EventBridge | Optional: scheduled experiments, periodic cleanup, supported event routing. Not a job queue or training runtime | Proposed, optional |
 | Lambda | Short orchestration, validation or event handling within its limits. Training does not default to Lambda | Proposed, optional |

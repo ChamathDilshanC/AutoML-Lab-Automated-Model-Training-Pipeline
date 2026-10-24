@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Status:** **Proposed**, except the `datasets` table, which is implemented (M2, `backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
+> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
 
 Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -69,6 +69,8 @@ erDiagram
 | `duration_seconds` | |
 | `status` | Run-level status |
 | `artifact_key` | Pointer to run artifact, if kept |
+
+**Implemented columns (M4).** `experiments`: `experiment_id` (PK, `ex_` + hex), `owner_id`, `dataset_id` (FK), `target_column`, `task`, `metric`, `algorithms` (JSON list), `random_seed`, `test_size`, `status`, `idempotency_key` (unique per owner when set), `created_at`, `started_at`, `finished_at`, `error_summary`, `selected_run_id`, `split_info` (JSON), `library_versions` (JSON). Index on `(status, created_at)` serves the worker's claim query. `experiment_runs`: `run_id` (PK, `rn_` + hex), `experiment_id` (FK), `algorithm` (unique per experiment), `status` (`SUCCEEDED` or `FAILED`), `hyperparameters` (JSON), `cv_score`, `cv_folds`, `metrics` (JSON, `null` for metrics that could not be computed), `duration_seconds`, `error_summary`, `rank` (`null` when unranked), `created_at`. No `configuration` JSON column: the configuration is stored as separate columns. The API and the worker are separate processes sharing one SQLite file, so connections use WAL mode and a 5-second busy timeout.
 
 ### 3.4 Model
 | Field | Notes |

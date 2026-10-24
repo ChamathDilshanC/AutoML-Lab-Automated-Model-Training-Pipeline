@@ -1,5 +1,13 @@
 import { API_BASE_URL } from "@/lib/config";
-import type { ApiErrorBody, Dataset, ValidationReport } from "@/lib/types";
+import type {
+  ApiErrorBody,
+  Dataset,
+  Experiment,
+  ExperimentCreate,
+  ExperimentOptions,
+  Leaderboard,
+  ValidationReport,
+} from "@/lib/types";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -50,6 +58,33 @@ export function validateDataset(datasetId: string): Promise<ValidationReport> {
   return request<ValidationReport>(
     `/api/v1/datasets/${encodeURIComponent(datasetId)}/validate`,
     { method: "POST" },
+  );
+}
+
+export function getExperimentOptions(signal?: AbortSignal): Promise<ExperimentOptions> {
+  return request<ExperimentOptions>("/api/v1/experiments/options", { signal });
+}
+
+/** The idempotency key makes a double submit return the same experiment instead of two. */
+export function createExperiment(
+  payload: ExperimentCreate,
+  idempotencyKey: string,
+): Promise<Experiment> {
+  return request<Experiment>("/api/v1/experiments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getExperiment(experimentId: string, signal?: AbortSignal): Promise<Experiment> {
+  return request<Experiment>(`/api/v1/experiments/${encodeURIComponent(experimentId)}`, { signal });
+}
+
+export function getLeaderboard(experimentId: string, signal?: AbortSignal): Promise<Leaderboard> {
+  return request<Leaderboard>(
+    `/api/v1/experiments/${encodeURIComponent(experimentId)}/results`,
+    { signal },
   );
 }
 

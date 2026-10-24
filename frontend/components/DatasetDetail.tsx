@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import DataQualityReport from "@/components/DataQualityReport";
 import { errorMessage, getDataset, validateDataset } from "@/lib/api";
@@ -57,6 +58,16 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <DataQualityReport dataset={view.dataset} />
+      {view.dataset.status === "READY" && (
+        <div>
+          <Link
+            href={`/experiments/new?dataset=${view.dataset.dataset_id}`}
+            className="inline-block rounded-md bg-accent px-4 py-2 font-medium text-on-accent"
+          >
+            Create an experiment
+          </Link>
+        </div>
+      )}
       {view.dataset.status === "UPLOADED" && (
         <div>
           <button

@@ -1,0 +1,127 @@
+"""Persistence for experiments and runs.
+
+Used by both the API and the worker process, so it must not import web-framework code.
+"""
+
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import CursorResult, select, update
+from sqlalchemy.orm import Session
+
+from app.core.time import utc_now
+from app.db.models import Experiment, ExperimentRun
+from app.schemas.experiments import ExperimentStatus
+
+STALE_MESSAGE = "The worker stopped before the experiment finished."
+
+
+def create_experiment(session: Session, **fields: Any) -> Experiment:
+    """Insert an experiment. Raises `IntegrityError` on a duplicate idempotency key."""
+    experiment = Experiment(**fields)
+    session.add(experiment)
+    session.commit()
+    session.refresh(experiment)
+    return experiment
+
+
+def get_experiment(session: Session, owner_id: str, experiment_id: str) -> Experiment | None:
+    return session.scalar(
+        select(Experiment).where(
+            Experiment.experiment_id == experiment_id, Experiment.owner_id == owner_id
+        )
+    )
+
+
+def find_by_idempotency_key(session: Session, owner_id: str, key: str) -> Experiment | None:
+    return session.scalar(
+        select(Experiment).where(Experiment.owner_id == owner_id, Experiment.idempotency_key == key)
+    )
+
+
+def list_runs(session: Session, experiment_id: str) -> list[ExperimentRun]:
+    return list(
+        session.scalars(
+            select(ExperimentRun)
+            .where(ExperimentRun.experiment_id == experiment_id)
+            .order_by(ExperimentRun.created_at, ExperimentRun.algorithm)
+        )
+    )
+
+
+def add_run(session: Session, **fields: Any) -> ExperimentRun:
+    run = ExperimentRun(**fields)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run
+
+
+def claim_next_queued(session: Session) -> Experiment | None:
+    """Atomically move the oldest `QUEUED` experiment to `RUNNING` and return it.
+
+    The conditional UPDATE means that when several workers race for a job, exactly one wins.
+    """
+    for _ in range(3):
+        candidate = session.scalar(
+            select(Experiment.experiment_id)
+            .where(Experiment.status == ExperimentStatus.QUEUED)
+            .order_by(Experiment.created_at, Experiment.experiment_id)
+            .limit(1)
+        )
+        if candidate is None:
+            return None
+        result = session.execute(
+            update(Experiment)
+            .where(
+                Experiment.experiment_id == candidate,
+                Experiment.status == ExperimentStatus.QUEUED,
+            )
+            .values(status=ExperimentStatus.RUNNING, started_at=utc_now())
+        )
+        session.commit()
+        assert isinstance(result, CursorResult)
+        if result.rowcount == 1:
+            experiment = session.get(Experiment, candidate)
+            if experiment is not None:
+                session.refresh(experiment)
+            return experiment
+    return None
+
+
+def finish_experiment(
+    session: Session,
+    experiment: Experiment,
+    *,
+    status: ExperimentStatus,
+    error_summary: str | None = None,
+    selected_run_id: str | None = None,
+    split_info: dict[str, Any] | None = None,
+    library_versions: dict[str, str] | None = None,
+) -> Experiment:
+    experiment.status = status
+    experiment.finished_at = utc_now()
+    experiment.error_summary = error_summary[:500] if error_summary else None
+    experiment.selected_run_id = selected_run_id
+    experiment.split_info = split_info
+    experiment.library_versions = library_versions
+    session.add(experiment)
+    session.commit()
+    session.refresh(experiment)
+    return experiment
+
+
+def fail_stale_experiments(
+    session: Session, timeout_seconds: int, now: datetime | None = None
+) -> int:
+    """Mark `RUNNING` experiments that started too long ago as `FAILED`. Returns the count."""
+    now = now or utc_now()
+    cutoff = now - timedelta(seconds=timeout_seconds)
+    result = session.execute(
+        update(Experiment)
+        .where(Experiment.status == ExperimentStatus.RUNNING, Experiment.started_at < cutoff)
+        .values(status=ExperimentStatus.FAILED, finished_at=now, error_summary=STALE_MESSAGE)
+    )
+    session.commit()
+    assert isinstance(result, CursorResult)
+    return int(result.rowcount)
