@@ -1,9 +1,18 @@
+# Keep the build context small and free of anything private or only useful for development.
 .venv
+venv
 __pycache__
+*.py[cod]
 .pytest_cache
 .mypy_cache
 .ruff_cache
 *.egg-info
 *.db
+*.sqlite
+*.sqlite3
 artifacts
 .env
+.env.*
+tests
+Dockerfile
+.dockerignore

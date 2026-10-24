@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.core.passwords import DUMMY_HASH, verify_password
@@ -34,7 +35,7 @@ def login(
     answer in about the same time.
     """
     allowed, retry_after = request.app.state.login_limiter.check(
-        f"login:{request.client.host if request.client else 'unknown'}"
+        f"login:{client_ip(request, settings.trusted_proxy_hops)}"
     )
     if not allowed:
         raise ApiError(

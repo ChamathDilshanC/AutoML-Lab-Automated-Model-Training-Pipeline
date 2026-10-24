@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.passwords import hash_password, validate_password_strength
 from app.db import users as user_repo
 from app.db.audit import record_audit
-from app.db.session import Base, SessionLocal, engine
+from app.db.session import SessionLocal, create_local_tables
 
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
 
@@ -24,7 +24,7 @@ def create_user(username: str, password: str) -> str:
     if not USERNAME_PATTERN.match(username):
         raise ValueError("Username must be 3 to 64 characters: letters, digits, '_', '.' or '-'.")
     validate_password_strength(password)
-    Base.metadata.create_all(engine)
+    create_local_tables()
     with SessionLocal() as session:
         try:
             user = user_repo.create_user(session, username, hash_password(password))
@@ -39,7 +39,7 @@ def create_user(username: str, password: str) -> str:
 
 def claim_legacy(username: str) -> dict[str, int]:
     """Give data created before accounts existed to a user."""
-    Base.metadata.create_all(engine)
+    create_local_tables()
     with SessionLocal() as session:
         user = user_repo.get_by_username(session, username)
         if user is None:

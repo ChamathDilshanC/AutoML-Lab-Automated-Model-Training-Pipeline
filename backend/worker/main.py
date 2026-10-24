@@ -12,7 +12,8 @@ import threading
 from collections.abc import Sequence
 
 from app.core.config import get_settings
-from app.db.session import Base, SessionLocal, engine
+from app.db.session import SessionLocal, create_local_tables
+from app.migrate import wait_until_migrated
 from app.services.aws import build_queue, build_storage
 from worker.jobs import process_message, process_next, run_loop, run_sqs_loop
 
@@ -34,8 +35,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.basicConfig(
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
-    # Safe to repeat: lets the worker start before the API has created the tables.
-    Base.metadata.create_all(engine)
+    if settings.environment == "local":
+        create_local_tables()  # safe to repeat; lets the worker start before the API
+    else:
+        # The API container runs the migrations; wait for it instead of failing on missing tables.
+        wait_until_migrated(timeout_seconds=settings.migration_wait_seconds)
 
     storage = build_storage(settings)
     poll_seconds = args.poll_seconds or settings.worker_poll_seconds

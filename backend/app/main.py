@@ -16,7 +16,7 @@ from app.core.rate_limit import RateLimiter
 from app.core.request_id import RequestIdMiddleware
 from app.core.tokens import resolve_secret_key
 from app.db import models  # noqa: F401  (registers tables on Base.metadata)
-from app.db.session import Base, SessionLocal, engine
+from app.db.session import SessionLocal, create_local_tables
 from app.services.aws import build_publisher, build_storage
 from app.services.reaper import run_reaper
 
@@ -24,9 +24,8 @@ from app.services.reaper import run_reaper
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    # Interim: create tables on start-up until a migration tool is chosen
-    # (see docs/DATABASE_SCHEMA.md).
-    Base.metadata.create_all(engine)
+    # Local convenience only. Elsewhere the schema is built by `python -m app.migrate`.
+    create_local_tables()
     stop = asyncio.Event()
     reaper = asyncio.create_task(
         run_reaper(
