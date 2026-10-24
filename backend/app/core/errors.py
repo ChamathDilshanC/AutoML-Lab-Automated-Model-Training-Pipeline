@@ -36,12 +36,14 @@ class ApiError(Exception):
         code: str,
         message: str,
         details: list[dict[str, str]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.details = details or []
+        self.headers = headers or {}
 
 
 def error_response(
@@ -50,6 +52,7 @@ def error_response(
     code: str,
     message: str,
     details: list[dict[str, str]] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     body: dict[str, Any] = {
@@ -60,14 +63,18 @@ def error_response(
             "request_id": request_id,
         }
     }
-    headers = {REQUEST_ID_HEADER: request_id} if request_id else None
-    return JSONResponse(body, status_code=status_code, headers=headers)
+    all_headers = dict(headers or {})
+    if request_id:
+        all_headers[REQUEST_ID_HEADER] = request_id
+    return JSONResponse(body, status_code=status_code, headers=all_headers or None)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
-        return error_response(request, exc.status_code, exc.code, exc.message, exc.details)
+        return error_response(
+            request, exc.status_code, exc.code, exc.message, exc.details, exc.headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(

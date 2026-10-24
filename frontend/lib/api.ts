@@ -1,3 +1,4 @@
+import { clearToken, getToken } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import type {
   ApiErrorBody,
@@ -6,9 +7,11 @@ import type {
   ExperimentCreate,
   ExperimentOptions,
   FeatureValue,
+  CurrentUser,
   Leaderboard,
   PredictionResponse,
   RegisteredModel,
+  TokenResponse,
   ValidationReport,
 } from "@/lib/types";
 
@@ -40,17 +43,50 @@ export function errorMessage(err: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
+const LOGIN_PATH = "/api/v1/auth/login";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, init);
+    response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   } catch (err) {
     if (init?.signal?.aborted) throw err;
     throw new ApiRequestError("Could not reach the server.", 0);
   }
+  // A 401 on any other call means the token expired or was revoked: sign out locally.
+  if (response.status === 401 && token && path !== LOGIN_PATH) clearToken();
   const text = await response.text();
   if (!response.ok) throw toError(response.status, text);
+  if (response.status === 204 || text === "") return undefined as T;
   return JSON.parse(text) as T;
+}
+
+export function login(username: string, password: string): Promise<TokenResponse> {
+  return request<TokenResponse>(LOGIN_PATH, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username, password }),
+  });
+}
+
+export function getMe(signal?: AbortSignal): Promise<CurrentUser> {
+  return request<CurrentUser>("/api/v1/auth/me", { signal });
+}
+
+export function deleteDataset(datasetId: string): Promise<void> {
+  return request<void>(`/api/v1/datasets/${encodeURIComponent(datasetId)}`, { method: "DELETE" });
+}
+
+export function revokeModel(modelId: string): Promise<RegisteredModel> {
+  return request<RegisteredModel>(`/api/v1/models/${encodeURIComponent(modelId)}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
 }
 
 export function getDataset(datasetId: string, signal?: AbortSignal): Promise<Dataset> {
@@ -131,12 +167,15 @@ export function uploadDataset(
     };
     xhr.onerror = () => reject(new ApiRequestError("Could not reach the server.", 0));
     xhr.onload = () => {
+      if (xhr.status === 401) clearToken();
       if (xhr.status === 201) {
         resolve(JSON.parse(xhr.responseText) as Dataset);
       } else {
         reject(toError(xhr.status, xhr.responseText));
       }
     };
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);

@@ -10,8 +10,8 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 
 | Area | State |
 |---|---|
-| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), `/experiments/new` (configuration form), `/experiments/[id]` (status polling and leaderboard), `/models` and `/models/[id]` (approval and a prediction form generated from the model's feature schema), design tokens in `globals.css` (`frontend/`) |
-| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. **M4 adds:** experiment routes (`/api/v1/experiments`: options, create, read, results), the `experiments` and `experiment_runs` tables and idempotent submission. **M5 adds:** model routes (list, read, approve, predict), the `models` table, and checksum-verified artifact loading with a small in-process cache of loaded pipelines |
+| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), `/experiments/new` (configuration form), `/experiments/[id]` (status polling and leaderboard), `/models` and `/models/[id]` (approval, revocation and a prediction form generated from the model's feature schema), `/login`, a sign-in gate around every other page, a header with the signed-in user, confirmation dialogs for approve, revoke and delete, design tokens in `globals.css` (`frontend/`) |
+| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. **M4 adds:** experiment routes (`/api/v1/experiments`: options, create, read, results), the `experiments` and `experiment_runs` tables and idempotent submission. **M5 adds:** model routes (list, read, approve, predict), the `models` table, and checksum-verified artifact loading with a small in-process cache of loaded pipelines. **M7 adds:** sign-in (`/api/v1/auth/login`, `/me`) with scrypt-hashed local accounts and JWT bearer tokens, one router-level authentication dependency in front of every other route, `DELETE` for datasets with cascade, `revoke` for models, per-user and per-address rate limits, security headers, an audit table, an operator CLI (`python -m app.cli`), and a background reaper that fails stale `RUNNING` experiments |
 | ML engine | **Implemented (M3):** `backend/automl/` provides dataset and target validation, a `ColumnTransformer` preprocessor, stratified/random splits, the algorithm allowlist with train-only grid search, held-out evaluation, and metric-aware ranking. It is not yet wired to the API or worker. `registry.py` is still a stub (M5) |
 | Worker | **Implemented (M4):** `python -m worker.main` is a separate process. It polls the database, atomically claims `QUEUED` experiments one at a time, runs the engine, records each run and the outcome, saves the winning pipeline as a versioned `joblib` artifact with a `metadata.json` before marking the experiment `SUCCEEDED`, and fails `RUNNING` jobs that exceed `JOB_TIMEOUT_SECONDS`. Any failure is recorded on the experiment and the loop continues. It imports no web-framework code (tested) |
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
@@ -225,8 +225,25 @@ Client calls the model-specific route → authenticate and authorise → validat
 | Warnings | Identifier-like columns, high-cardinality columns, suspected target leakage, tiny datasets |
 | Selection policy | Rank only runs that finished evaluation and pass minimum validity checks; store all metrics; state that the best candidate score is not a real-world performance guarantee |
 
-## 9. Authentication and authorisation (Proposed)
-A maintained authentication solution is used (provider **Open**). Every dataset, experiment and model access performs an ownership check. The prediction endpoint requires authentication and rate limiting before public exposure. Details: [SECURITY.md](SECURITY.md).
+## 9. Authentication and authorisation (Implemented for local use, M7)
+Accounts are local and created by an operator; sign-in returns a signed JWT sent as a bearer token ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)). Every `/api/v1` route except sign-in sits behind one router-level dependency, and repositories filter by the caller's user ID, so a foreign ID is a `404` identical to a missing one. Predictions are rate limited per user. The worker has no user: it acts on rows that were already authorised when they were created.
+
+```mermaid
+sequenceDiagram
+    actor U as Browser
+    participant API as FastAPI
+    participant DB as Metadata store
+    U->>API: POST /auth/login (username, password)
+    API->>DB: load user, verify scrypt hash
+    API-->>U: access_token (60 min)
+    U->>API: GET /models/{id} with Bearer token
+    API->>API: verify signature, exp, algorithm
+    API->>DB: load user (must exist and be active)
+    API->>DB: load model WHERE id AND owner = user
+    API-->>U: 200, or 404 if not the owner's
+```
+
+The identity provider for a cloud deployment is **Open**. Details: [SECURITY.md](SECURITY.md).
 
 ## 10. Configuration and secrets boundary
 - Local development: environment variables loaded from an untracked `.env`; the repo carries only `.env.example` with variable **names**.
@@ -269,6 +286,7 @@ Details and cost controls: [DEPLOYMENT.md](DEPLOYMENT.md).
 - [ADR 0001 — Local-first, adapter-based architecture](ADR/0001-local-first-adapter-architecture.md)
 - [ADR 0002 — Trusted joblib artifacts only](ADR/0002-trusted-joblib-artifacts.md)
 - [ADR 0003 — Save the winning model at training time](ADR/0003-save-winning-model-at-training-time.md)
+- [ADR 0004 — Local accounts with bearer tokens](ADR/0004-local-accounts-and-bearer-tokens.md)
 
 ## 17. Open questions
 1. Authentication provider and API-credential model for the prediction endpoint.

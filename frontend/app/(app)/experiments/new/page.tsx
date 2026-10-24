@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import ExperimentForm from "@/components/ExperimentForm";
 
+// Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
+export const instant = false;
+
 export const metadata = { title: "New experiment · AutoML Lab" };
 
 export default function NewExperimentPage() {

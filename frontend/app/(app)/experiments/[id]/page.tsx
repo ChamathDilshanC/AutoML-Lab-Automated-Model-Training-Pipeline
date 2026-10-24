@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import ExperimentDetail from "@/components/ExperimentDetail";
 
+// Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
+export const instant = false;
+
 export const metadata = { title: "Experiment · AutoML Lab" };
 
 async function ExperimentView({ params }: { params: Promise<{ id: string }> }) {

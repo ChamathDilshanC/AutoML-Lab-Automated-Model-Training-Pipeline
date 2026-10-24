@@ -28,7 +28,7 @@ Related: [Architecture § 14](ARCHITECTURE.md#14-deployment-topology) · [Securi
 Select exact runtimes only after measuring memory, execution duration, package size and expected workload, and confirming all service charges.
 
 ## 4. Configuration
-Environment variables per environment; local values in an untracked `.env`; `.env.example` lists names only. In AWS use IAM roles and temporary credentials; add a managed secrets service only if necessary and budget-checked.
+Environment variables per environment; local values in an untracked `.env`; `.env.example` lists names only. `SECRET_KEY` (at least 32 random characters) is **required whenever `ENVIRONMENT` is not `local`**: the API refuses to start without it. Locally it may be omitted, which gives a random per-process key, so sign-ins reset when the API restarts. Create accounts with `python -m app.cli create-user <name>` (inside the backend container when using Docker Compose); there is no public sign-up. Rate limits and the reaper are tuned with `PREDICT_RATE_LIMIT_PER_MINUTE`, `LOGIN_RATE_LIMIT_PER_MINUTE`, `JOB_TIMEOUT_SECONDS` and `REAPER_INTERVAL_SECONDS`. In AWS use IAM roles and temporary credentials; add a managed secrets service only if necessary and budget-checked.
 
 ## 5. CI/CD (Proposed)
 Pipeline stages on GitHub Actions:

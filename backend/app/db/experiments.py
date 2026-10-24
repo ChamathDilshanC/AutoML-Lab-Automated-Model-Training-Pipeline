@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import CursorResult, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.time import utc_now
 from app.db.models import Experiment, ExperimentRun
@@ -99,13 +99,26 @@ def finish_experiment(
     split_info: dict[str, Any] | None = None,
     library_versions: dict[str, str] | None = None,
 ) -> Experiment:
-    experiment.status = status
-    experiment.finished_at = utc_now()
-    experiment.error_summary = error_summary[:500] if error_summary else None
-    experiment.selected_run_id = selected_run_id
-    experiment.split_info = split_info
-    experiment.library_versions = library_versions
-    session.add(experiment)
+    """Record the outcome, but only if the experiment is still `RUNNING`.
+
+    If something else already ended it (for example the stale-job reaper), that outcome stands
+    and this call changes nothing. The returned experiment reflects what is in the database.
+    """
+    session.execute(
+        update(Experiment)
+        .where(
+            Experiment.experiment_id == experiment.experiment_id,
+            Experiment.status == ExperimentStatus.RUNNING,
+        )
+        .values(
+            status=status,
+            finished_at=utc_now(),
+            error_summary=error_summary[:500] if error_summary else None,
+            selected_run_id=selected_run_id,
+            split_info=split_info,
+            library_versions=library_versions,
+        )
+    )
     session.commit()
     session.refresh(experiment)
     return experiment
@@ -125,3 +138,9 @@ def fail_stale_experiments(
     session.commit()
     assert isinstance(result, CursorResult)
     return int(result.rowcount)
+
+
+def reap_stale(session_factory: sessionmaker[Session], timeout_seconds: int) -> int:
+    """Fail `RUNNING` experiments older than the timeout, using a fresh session."""
+    with session_factory() as session:
+        return fail_stale_experiments(session, timeout_seconds)

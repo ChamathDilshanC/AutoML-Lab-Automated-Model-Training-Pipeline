@@ -10,6 +10,7 @@ from automl.tasks import Task
 class ApprovalStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
+    REVOKED = "REVOKED"  # terminal: a revoked model never serves predictions again
 
 
 class FeatureSpec(BaseModel):
@@ -43,6 +44,12 @@ class ModelResponse(BaseModel):
 
 class ModelApproveRequest(BaseModel):
     """Approval makes a model available for predictions, so it must be explicit."""
+
+    confirm: Literal[True]
+
+
+class ModelRevokeRequest(BaseModel):
+    """Revoking stops predictions at once and cannot be undone, so it must be explicit."""
 
     confirm: Literal[True]
 

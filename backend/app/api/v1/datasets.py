@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_storage
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.core.security import get_owner_id
+from app.db.audit import record_audit
 from app.db.datasets import get_dataset
 from app.db.models import Dataset
 from app.db.session import get_session
@@ -59,3 +60,20 @@ def validate_dataset(
 @router.get("/{dataset_id}", response_model=DatasetResponse)
 def read_dataset(dataset_id: str, session: SessionDep, owner_id: OwnerDep) -> DatasetResponse:
     return dataset_service.to_response(_owned_dataset(session, owner_id, dataset_id))
+
+
+@router.delete("/{dataset_id}", status_code=204)
+def delete_dataset(
+    dataset_id: str, session: SessionDep, storage: StorageDep, owner_id: OwnerDep
+) -> Response:
+    """Delete a dataset together with its experiments, runs, models and stored files."""
+    dataset = _owned_dataset(session, owner_id, dataset_id)
+    dataset_service.delete_dataset(session, storage, dataset)
+    record_audit(
+        session,
+        "dataset.delete",
+        actor_id=owner_id,
+        resource_type="dataset",
+        resource_id=dataset_id,
+    )
+    return Response(status_code=204)

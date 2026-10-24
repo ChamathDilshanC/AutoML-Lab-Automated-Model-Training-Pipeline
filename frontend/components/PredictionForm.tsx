@@ -147,7 +147,9 @@ export default function PredictionForm({ model }: { model: RegisteredModel }) {
       {!approved && (
         <p className="rounded-md border border-warning p-3">
           <span aria-hidden="true">○ </span>
-          Approve this model to enable predictions.
+          {model.approval_status === "REVOKED"
+            ? "This model's approval was revoked, so it cannot make predictions."
+            : "Approve this model to enable predictions."}
         </p>
       )}
       <form onSubmit={submit} className="flex flex-col gap-4">

@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4) and `models` (M5) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
+> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4), `models` (M5), and `users` and `audit_events` (M7) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
 
 Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -84,7 +84,11 @@ erDiagram
 | `approval_status` | e.g. `PENDING`, `APPROVED`, `REVOKED` (names Proposed) |
 | `created_at` | |
 
-**Implemented columns (M5).** `models`: `model_id` (PK, `md_` + hex; identifies one immutable artifact, unlike the sketch above where it was the logical model), `version` (integer, counted per owner, dataset, target column and task; unique together with them), `owner_id`, `dataset_id`, `experiment_id`, `run_id`, `task`, `target_column`, `algorithm`, `metric`, `metrics` (winner's test scores), `hyperparameters`, `feature_schema` (JSON), `classes` (JSON, classification only), `library_versions`, `artifact_key`, `metadata_key`, `artifact_sha256`, `artifact_bytes`, `approval_status` (`PENDING`, `APPROVED`), `approved_at`, `created_at`. There is no update path for the artifact fields. `REVOKED` and deployment status are not implemented.
+**Implemented columns (M5).** `models`: `model_id` (PK, `md_` + hex; identifies one immutable artifact, unlike the sketch above where it was the logical model), `version` (integer, counted per owner, dataset, target column and task; unique together with them), `owner_id`, `dataset_id`, `experiment_id`, `run_id`, `task`, `target_column`, `algorithm`, `metric`, `metrics` (winner's test scores), `hyperparameters`, `feature_schema` (JSON), `classes` (JSON, classification only), `library_versions`, `artifact_key`, `metadata_key`, `artifact_sha256`, `artifact_bytes`, `approval_status` (`PENDING`, `APPROVED`, `REVOKED`), `approved_at`, `created_at`. There is no update path for the artifact fields. `REVOKED` was added in M7; a deployment status is not implemented.
+
+**Implemented (M7).** `users`: `user_id` (PK, `us_` + hex), `username` (unique, stored lower-case), `password_hash` (scrypt, parameters and salt inside the string), `is_active`, `created_at`. `owner_id` columns on datasets, experiments and models now hold a `user_id`. Rows created before M7 carry the placeholder owner `local-user`; `python -m app.cli claim-legacy <username>` reassigns them. No existing table gained a column in M7, because there is still no migration tool: new tables are created at start-up and existing ones are never altered.
+
+**`audit_events`** (M7): `event_id` (PK, `ev_` + hex), `created_at`, `actor_id` (null when nobody is signed in), `action`, `resource_type`, `resource_id`, `outcome` (`success` or `failure`), `detail` (short, never a password, token or data value). Written for sign-in successes and failures (a failure records the attempted username), account creation, model approval and revocation, and dataset deletion. Nothing reads the table through the API yet and there is no retention policy.
 
 ### 3.5 AuditEvent
 `event_id`, `actor`, `action`, `resource_id`, `timestamp`, `outcome`. **Never** stores dataset row values, secrets or tokens.

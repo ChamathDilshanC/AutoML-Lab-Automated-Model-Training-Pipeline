@@ -34,6 +34,7 @@ RUN_FAILURE = "Training failed for this algorithm."
 NO_RESULT = "No algorithm produced a usable result."
 DATASET_UNAVAILABLE = "The dataset is no longer available."
 MODEL_NOT_SAVED = "The winning model could not be saved."
+STOPPED_EARLY = "The experiment was stopped before it finished."
 DEFAULT_MAX_ARTIFACT_BYTES = 200 * 1024 * 1024
 
 
@@ -156,6 +157,10 @@ def run_experiment(
         "n_test": len(split.X_test),
     }
     winner = ranking[0]
+    session.refresh(experiment)
+    if experiment.status != ExperimentStatus.RUNNING:
+        # Ended by something else while training (for example the stale-job reaper).
+        raise JobFailure(STOPPED_EARLY)
     try:
         register_model(
             session,

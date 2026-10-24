@@ -5,6 +5,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       ENVIRONMENT: local
+      SECRET_KEY: ${SECRET_KEY:-}  # empty is allowed locally: tokens then reset on restart
       DATABASE_URL: sqlite:////data/automl.db
       ARTIFACT_DIR: /data/artifacts
       CORS_ORIGINS: '["http://localhost:3000"]'

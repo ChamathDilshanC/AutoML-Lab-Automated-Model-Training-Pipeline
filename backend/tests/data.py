@@ -1,12 +1,15 @@
 """Small deterministic datasets and helpers shared by the API and worker tests."""
 
 from collections.abc import Callable
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.db import experiments as experiment_repo
+from app.db.models import Experiment
 from app.services.storage import StorageAdapter
 from worker.jobs import process_next
 
@@ -96,3 +99,29 @@ def trained_model_id(
     board = client.get(f"/api/v1/experiments/{experiment_id}/results").json()
     assert board["model_id"], board
     return str(board["model_id"])
+
+
+def insert_experiment(
+    session: Session,
+    dataset_id: str,
+    name: str,
+    created_at: datetime,
+    owner_id: str = "local-user",
+    **fields: object,
+) -> Experiment:
+    """Insert an experiment row directly, to set up states the API cannot reach (RUNNING, stale)."""
+    values: dict[str, object] = {
+        "experiment_id": name,
+        "owner_id": owner_id,
+        "dataset_id": dataset_id,
+        "target_column": "label",
+        "task": "classification",
+        "metric": "f1",
+        "algorithms": ["decision_tree"],
+        "random_seed": 1,
+        "test_size": 0.2,
+        "status": "QUEUED",
+        "created_at": created_at,
+    }
+    values.update(fields)
+    return experiment_repo.create_experiment(session, **values)

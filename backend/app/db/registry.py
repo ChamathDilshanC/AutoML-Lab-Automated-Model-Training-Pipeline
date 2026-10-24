@@ -57,12 +57,15 @@ def get_model_for_experiment(session: Session, experiment_id: str) -> Registered
     )
 
 
-def approve_model(session: Session, model: RegisteredModel) -> RegisteredModel:
-    """Mark a model approved. Approving an approved model changes nothing."""
-    if model.approval_status != ApprovalStatus.APPROVED:
-        model.approval_status = ApprovalStatus.APPROVED
+def set_approval(
+    session: Session, model: RegisteredModel, status: ApprovalStatus
+) -> RegisteredModel:
+    """Record an approval transition. The rules about which transitions are allowed live in
+    `app.services.models`."""
+    model.approval_status = status
+    if status == ApprovalStatus.APPROVED:
         model.approved_at = utc_now()
-        session.add(model)
-        session.commit()
-        session.refresh(model)
+    session.add(model)
+    session.commit()
+    session.refresh(model)
     return model

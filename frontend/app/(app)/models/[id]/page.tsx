@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import ModelDetail from "@/components/ModelDetail";
 
+// Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
+export const instant = false;
+
 export const metadata = { title: "Model · AutoML Lab" };
 
 async function ModelView({ params }: { params: Promise<{ id: string }> }) {
