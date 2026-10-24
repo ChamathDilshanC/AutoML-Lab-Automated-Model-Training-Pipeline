@@ -96,6 +96,18 @@ def test_there_is_no_nat_gateway_and_no_open_database_port(network: dict[str, An
             assert rule["from_port"] == rule["to_port"] == 443
 
 
+def test_availability_zones_are_not_looked_up(
+    network: dict[str, Any], tfvars: dict[str, Any]
+) -> None:
+    # Some organizations deny ec2:DescribeAvailabilityZones, which that data source calls.
+    assert "aws_availability_zones" not in _all_text()
+    assert tfvars["availability_zones"]["default"] is None
+    assert "${var.region}a" in network["locals"][0]["azs"]
+    subnets = blocks(network, "resource", "aws_subnet")
+    for subnet in subnets.values():
+        assert subnet["availability_zone"] == "${local.azs[count.index]}"
+
+
 def test_the_api_reaches_aws_through_vpc_endpoints(network: dict[str, Any]) -> None:
     endpoints = blocks(network, "resource", "aws_vpc_endpoint")
     assert endpoints["s3"]["vpc_endpoint_type"] == "Gateway"

@@ -49,12 +49,12 @@ You need: an AWS account you control, Terraform 1.6 or newer, the AWS CLI, Docke
 1. **Base infrastructure.**
    ```bash
    cd infrastructure/terraform
-   cp terraform.tfvars.example terraform.tfvars    # set github_repository and budget_alert_email
+   cp terraform.tfvars.example terraform.tfvars    # set region, github_repository and budget_alert_email
    terraform init
    terraform plan -out=tfplan                      # read it
    terraform apply tfplan
    ```
-   RDS takes several minutes. Confirm the budget's subscription email if AWS sends one.
+   The subnets use the zones `<region>a` and `<region>b` without looking them up (some organizations deny that lookup); set `availability_zones` if your account has other zones. RDS takes several minutes. Confirm the budget's subscription email if AWS sends one.
 2. **First image.** Push it by hand (the services in step 3 cannot start without it; later images are pushed by the pipeline):
    ```bash
    REPO=$(terraform output -raw ecr_repository_url)

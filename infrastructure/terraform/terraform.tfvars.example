@@ -1,5 +1,5 @@
 # Copy to terraform.tfvars (which is git-ignored) and adjust. Every value is optional.
-region          = "eu-west-1"
+region          = "us-east-1"   # the subnets use <region>a and <region>b unless availability_zones is set
 allowed_origins = ["http://localhost:3000"]
 
 # Required.

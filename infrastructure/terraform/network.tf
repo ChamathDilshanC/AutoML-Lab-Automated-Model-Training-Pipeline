@@ -7,12 +7,11 @@
 #                    live here. The API reaches S3 through a gateway endpoint (no hourly charge)
 #                    and SQS through an interface endpoint (billed per hour and per GB).
 
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
+# The zones are not looked up: the lookup (ec2:DescribeAvailabilityZones) is denied by some
+# organizations' service control policies. By default the first two zones of the region are named
+# by suffix (us-east-1a and us-east-1b); set availability_zones if your account uses others.
 locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, 2)
+  azs = var.availability_zones != null ? var.availability_zones : ["${var.region}a", "${var.region}b"]
 }
 
 resource "aws_vpc" "main" {
