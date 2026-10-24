@@ -1,7 +1,7 @@
 variable "region" {
   description = "AWS region for every resource."
   type        = string
-  default     = "eu-west-1"
+  default     = "us-east-1"
 }
 
 variable "name_prefix" {
@@ -66,6 +66,17 @@ variable "vpc_cidr" {
   description = "Address range of the VPC."
   type        = string
   default     = "10.20.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "Two availability zones for the subnets. Leave null to use <region>a and <region>b. Set it when your account does not have those zones, for example [\"us-east-1a\", \"us-east-1c\"]."
+  type        = list(string)
+  default     = null
+
+  validation {
+    condition     = var.availability_zones == null || (length(var.availability_zones) == 2 && length(distinct(var.availability_zones)) == 2)
+    error_message = "Give exactly two different zones from the chosen region, e.g. [\"us-east-1a\", \"us-east-1b\"]."
+  }
 }
 
 variable "db_engine_major_version" {
@@ -157,12 +168,6 @@ variable "worker_desired_count" {
   }
 }
 
-variable "enable_ecs_exec" {
-  description = "Allow `aws ecs execute-command` into the worker task (needs the Session Manager plugin). For admin tasks such as creating the first user; turn it off afterwards."
-  type        = bool
-  default     = false
-}
-
 variable "trusted_proxy_hops" {
   description = "Proxies in front of the API that append to X-Forwarded-For (App Runner is one). Used for the per-client sign-in limit."
   type        = number
@@ -211,4 +216,10 @@ variable "budget_limit_usd" {
   description = "Monthly cost, in USD, above which alerts are sent. An alert only: nothing is stopped."
   type        = number
   default     = 10
+}
+
+variable "enable_ecs_exec" {
+  description = "Enable ECS Exec for debugging container tasks."
+  type        = bool
+  default     = false
 }
