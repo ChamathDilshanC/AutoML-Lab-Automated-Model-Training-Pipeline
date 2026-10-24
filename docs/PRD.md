@@ -1,6 +1,6 @@
 # Product Requirements Document
 
-> **Status:** greenfield. No feature below is implemented yet; every requirement is **Proposed** unless marked otherwise. Numeric limits are **proposed starting points** pending measurement.
+> **Status:** early scaffold. Only FR-062 is implemented; every other requirement is **Proposed** unless marked otherwise. Numeric limits are **proposed starting points** pending measurement.
 
 Related: [Architecture](ARCHITECTURE.md) · [API spec](API_SPEC.md) · [Design system](DESIGN_SYSTEM.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md)
 
@@ -40,7 +40,8 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 ## 5. Feature status
 | Feature | Status |
 |---|---|
-| All features in this PRD | Proposed — repository has no application code |
+| FR-062 `GET /health` | **Implemented (M1)** |
+| All other features in this PRD | Proposed |
 
 ## 6. MVP scope (Definition of Done for the first portfolio release)
 A user can: upload a valid CSV and receive a clear data-quality report; select target, task and metric; run multiple supported algorithms through a reproducible pipeline; compare metrics and see why a model was selected; save and version the selected model; submit a valid prediction request via FastAPI; view experiment status, logs and understandable errors; and run tests and CI successfully from a clean checkout while following the documented security, deployment and cost-control steps.

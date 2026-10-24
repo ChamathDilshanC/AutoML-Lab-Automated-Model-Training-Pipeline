@@ -1,13 +1,13 @@
 # Contributing to AutoML Lab
 
-Thanks for your interest. The project is currently in its **documentation and planning phase**: there is no application code yet, so the most useful contributions today are review and refinement of the documents in [docs/](docs/README.md).
+Thanks for your interest. The project is at the **M1 scaffold** stage: only the health endpoint and a UI shell exist. The most useful contributions today are review of the documents in [docs/](docs/README.md) and work on the next milestones in the [roadmap](docs/ROADMAP.md).
 
 Sole listed maintainer: **ChamathDilshanC** ([@ChamathDilshanC](https://github.com/ChamathDilshanC)). See [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 Coding agents must also follow [AGENTS.md](AGENTS.md).
 
 ## 1. Setup and prerequisites
-Setup instructions will be added when the services are scaffolded (milestone M1 in [docs/ROADMAP.md](docs/ROADMAP.md)). The planned stack is Python (FastAPI, scikit-learn), Next.js, and optional AWS services. Until then you only need Git and a Markdown editor. Do not add commands to docs that you have not run.
+Python 3.11+ and Node 20.9+ (developed with Node 24). Install and run commands are in [AGENTS.md § 5](AGENTS.md#5-commands) and the [README](README.md). The planned stack is Python (FastAPI, scikit-learn), Next.js, and optional AWS services. Do not add commands to docs that you have not run.
 
 ## 2. Workflow
 1. Open or find an issue describing the change.
@@ -18,7 +18,7 @@ Setup instructions will be added when the services are scaffolded (milestone M1 
 6. Address review comments; the maintainer merges.
 
 ## 3. Code style
-Formatter, linter and type-checker choices are **TBD** and will be recorded in [AGENTS.md](AGENTS.md) in M1. Meanwhile: typed, small, readable modules; the ML engine in `backend/automl/` must stay free of AWS and web-framework imports.
+Backend: Ruff (lint and format) and mypy. Frontend: ESLint and TypeScript. Typed, small, readable modules; the ML engine in `backend/automl/` must stay free of AWS and web-framework imports.
 
 ## 4. Testing requirements
 New behaviour needs tests, using deterministic fixtures and fixed seeds. ML changes must keep the no-leakage and reproducibility tests passing. See [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).

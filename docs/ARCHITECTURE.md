@@ -1,6 +1,6 @@
 # System Architecture
 
-> **Status of this document:** the repository currently contains no application code. Everything below is the **target architecture (Proposed)** taken from the owner's architecture brief. The *Current state* section is the only part that describes what exists today.
+> **Status of this document:** apart from the M1 scaffold, the repository contains no application code. Everything below is the **target architecture (Proposed)** taken from the owner's architecture brief. The *Current state* section is the only part that describes what exists today.
 
 Legend: **Implemented** = verified in code/config · **Proposed** = planned design · **Assumption** · **Open question**. See [docs/README.md](README.md).
 
@@ -10,10 +10,15 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 
 | Area | State |
 |---|---|
-| Application code (frontend, backend, worker) | None — greenfield |
-| Infrastructure code | None |
-| CI workflows | None |
-| Repository | `main` contains only `.gitignore` and a stub `README.md` before this documentation was added |
+| Frontend | **Implemented (M1):** Next.js App Router shell with a backend health indicator (`frontend/`) |
+| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). No routes under `/api/v1` yet, no metadata tables |
+| ML engine | **Stubs only (M1):** `backend/automl/` modules exist as empty docstring files |
+| Worker | **Stub (M1):** `backend/worker/main.py` logs and exits |
+| Infrastructure | `infrastructure/terraform/` exists and is empty |
+| CI | **Implemented (M1):** `.github/workflows/ci.yml` runs backend lint/format/type/test and frontend lint/type/build |
+| Local run | `docker-compose.yml` defined; not yet run |
+
+Everything else in this document is the target design.
 
 ## 2. System context and boundaries (Proposed)
 
