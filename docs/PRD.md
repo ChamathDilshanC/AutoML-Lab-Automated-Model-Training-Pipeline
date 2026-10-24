@@ -1,6 +1,6 @@
 # Product Requirements Document
 
-> **Status:** early scaffold. Only FR-062 is implemented; every other requirement is **Proposed** unless marked otherwise. Numeric limits are **proposed starting points** pending measurement.
+> **Status:** early build. See the feature status table in section 5; every requirement not listed there is **Proposed**. Numeric limits are **proposed starting points** pending measurement.
 
 Related: [Architecture](ARCHITECTURE.md) · [API spec](API_SPEC.md) · [Design system](DESIGN_SYSTEM.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md)
 
@@ -41,6 +41,8 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | Feature | Status |
 |---|---|
 | FR-062 `GET /health` | **Implemented (M1)** |
+| FR-020, FR-021, FR-022, FR-024, FR-026, FR-027, FR-030 | **Implemented in the ML engine (M3)**; not yet reachable through the API or UI |
+| FR-023, FR-025 | **Partly implemented (M3)**: hyper-parameters, metrics, split strategy, seed and library versions are recorded; run duration/status are M4 |
 | All other features in this PRD | Proposed |
 
 ## 6. MVP scope (Definition of Done for the first portfolio release)
