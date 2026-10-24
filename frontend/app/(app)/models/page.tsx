@@ -1,6 +1,9 @@
 import Link from "next/link";
 import ModelList from "@/components/ModelList";
 
+// Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
+export const instant = false;
+
 export const metadata = { title: "Models · AutoML Lab" };
 
 export default function ModelsPage() {

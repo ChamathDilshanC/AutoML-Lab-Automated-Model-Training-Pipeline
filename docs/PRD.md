@@ -50,6 +50,9 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | FR-015, FR-016, FR-033 | Not implemented (cancellation, time-aware split, metric charts) |
 | FR-040, FR-041, FR-042, FR-043 | **Implemented (M5)**: the winning pipeline is saved as a versioned artifact with metadata; versions are immutable (no update path); models start `PENDING` and only `APPROVED` ones serve predictions; list and detail views |
 | FR-050, FR-051, FR-052, FR-053, FR-054 | **Implemented (M5)**: strict schema validation, batch-size limit, predictions with model version and request ID, version logged per request, and a prediction form generated from the schema. FR-051's request-size limit is the general body limit, not a prediction-specific one |
+| FR-006 | **Implemented (M7)**: deleting a dataset removes its source file, experiments, runs, models and artifacts. No retention window: deletion is immediate |
+| FR-060, FR-061 | **Implemented (M7)** for local accounts: sign-in, a token on every route, ownership checks returning 404 for foreign IDs, and audit events for sign-in, account creation, approve, revoke and delete |
+| FR-042 (revocation) | **Implemented (M7)**: `REVOKED` is terminal and stops predictions immediately |
 | All other features in this PRD | Proposed |
 
 ## 6. MVP scope (Definition of Done for the first portfolio release)
@@ -129,7 +132,7 @@ Priority: **P0** = required for MVP, **P1** = important, **P2** = later.
 | FR-062 | `GET /health` returns liveness. | P0 |
 
 ## 8. Permissions and role boundaries
-Default rule (Proposed): a user may read and modify only resources they own. Cross-user sharing, admin roles and organisation tenancy are **Open** and out of the MVP.
+Default rule (**Implemented**, M7): a user may read and modify only resources they own. Cross-user sharing, admin roles and organisation tenancy are **Open** and out of the MVP.
 
 ## 9. Key workflows and edge cases
 - **Upload then reject:** file passes declared size but exceeds the limit when measured → `REJECTED`, object removed.

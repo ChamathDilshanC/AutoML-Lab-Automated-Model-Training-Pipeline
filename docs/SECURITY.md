@@ -31,9 +31,9 @@ Trust boundaries: browser ↔ API · API ↔ storage · API ↔ worker · worker
 | Privilege creep in CI/CD | GitHub OIDC with a narrowly scoped IAM role instead of long-lived keys, where supported |
 
 ## 3. Authentication and authorisation
-- Use a maintained authentication solution; the specific provider is **Open** (cost and eligibility to be checked before selecting any AWS-managed option).
-- Ownership checks are enforced in the service layer, not only the route layer.
-- Prediction API credentials (user token vs API key) are **Open**.
+- **Implemented (M7):** local accounts, scrypt password hashes and JWT bearer tokens ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)). Details and limits are in § 15.
+- Ownership checks are enforced in the repositories (every lookup filters by the caller's user ID) behind a router-level authentication dependency.
+- The identity provider for a cloud deployment is **Open** (cost and eligibility to be checked before selecting any AWS-managed option). Prediction credentials are the same user tokens; a separate API-key scheme for machine clients is **Open**.
 
 ## 4. Storage security
 Private buckets with Block Public Access; encryption at rest; TLS only; prefix-scoped permissions; lifecycle expiration of temporary uploads and old artifacts; no secrets or sensitive data in object names.
@@ -65,7 +65,7 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - Upload size is capped at write time (`MAX_UPLOAD_BYTES`) and, when `Content-Length` is declared, refused up front. A chunked upload without `Content-Length` is still parsed before the cap applies; a stricter limit would need a streaming parser or a reverse proxy.
 - Errors use one envelope with a request ID, never include stack traces, paths or cell values, and validation details name fields only.
 - Dataset reads are scoped to the owner and return `404` for foreign IDs. The owner is a fixed placeholder until authentication exists (M7), so this is not yet real access control.
-- Not implemented yet: authentication, rate limiting, malware scanning, retention and deletion.
+- Not implemented at that point: authentication, rate limiting, retention and deletion (added in M7, § 15) and malware scanning (still open).
 
 ## 13. Implemented so far (M4)
 - Experiment configuration is validated against the stored schema and the algorithm allowlist; algorithm names are looked up in a table and never imported or evaluated.
@@ -81,4 +81,33 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - A model trained with another scikit-learn version is refused rather than loaded.
 - Which version answered each request is logged with the request ID and row count, never the input values.
 - The model's feature schema lists the string values seen in training for columns with at most 50 distinct values, so the form can offer them. That is the owner's own data, shown only to the owner, but it means a categorical column's values are exposed through `GET /api/v1/models`. Columns with more distinct values list none.
-- **Not implemented:** authentication, rate limiting on `/predict`, a prediction-specific request-size limit (the general upload body limit applies), revoking approval, deleting models and artifacts, and removing a deleted dataset's models.
+- **Not implemented at that point:** authentication, rate limiting on `/predict`, revoking approval and removing a deleted dataset's models (all added in M7, § 15). Still open: a prediction-specific request-size limit (the general upload body limit applies) and deleting a single model.
+
+## 15. Implemented so far (M7)
+**Accounts and passwords.** No public sign-up; an operator creates accounts with `python -m app.cli create-user`. Passwords are 12 to 128 characters, hashed with scrypt and a per-user salt, and compared in constant time. An unknown username costs the same work as a wrong password and gets the same answer, so sign-in does not reveal which usernames exist.
+
+**Tokens.** HS256 JWTs signed with `SECRET_KEY` (at least 32 characters, mandatory unless `ENVIRONMENT` is `local`; the app refuses to start without it elsewhere). The algorithm is pinned, `exp`, `iat` and `sub` are required, tokens last 60 minutes, and the user is loaded on every request so a disabled or deleted account loses access immediately. Tests forge expired, wrong-key, `alg: none`, wrong-algorithm, claim-less and tampered tokens; all are rejected.
+
+**Every route is protected, and a test proves it.** All `/api/v1` routes except sign-in sit behind one router-level dependency, and a test walks the OpenAPI document and calls each one without a token (14 operations today). Breaking the protection of one router was confirmed to fail that test.
+
+**Ownership (IDOR).** Repositories filter by the caller's user ID. For every route, another user's ID returns the same `404`, with the same body and headers apart from the request ID, as an ID that does not exist. Tests cover all ten ways of touching a dataset, experiment or model by ID, and that failed attempts change nothing.
+
+**Abuse limits.** Sign-in: 10 attempts per minute per client address. Predictions: 60 per minute per user. Both are in-memory token buckets (`429` with `Retry-After`), checked before the request body is processed. Because the buckets live in one process, several API processes multiply the limits, and behind a reverse proxy all clients appear to share its address (forwarded headers are not trusted).
+
+**Deletion and revocation.** Deleting a dataset removes its experiments, runs, models and files, refuses while an experiment is running, and evicts cached pipelines. Revoking is immediate and permanent, because approval is read from the database on every prediction. Both, and approval, are written to `audit_events` together with sign-ins and account creation.
+
+**Headers.** Every response carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`; API responses are `Cache-Control: no-store`. CORS allows only the configured origins, the methods `GET`, `POST` and `DELETE`, and the headers `Content-Type`, `Authorization` and `Idempotency-Key`.
+
+**Abandoned jobs.** A `RUNNING` experiment older than `JOB_TIMEOUT_SECONDS` (default 30 minutes) is marked `FAILED`. The API runs this check in the background every `REAPER_INTERVAL_SECONDS` (default 60) and the worker runs it on every poll, so it works even if the worker has died. Finishing is conditional on the experiment still being `RUNNING`, so a worker that finishes late cannot overwrite the reaper's verdict, and it skips saving a model in that case.
+
+**Browser.** The token is kept in `sessionStorage` (cleared when the tab closes). A `401` from any call clears it and sends the user to `/login`. The `next` redirect is restricted to paths on this site.
+
+**Known gaps (not implemented).**
+- No server-side logout or token revocation: a stolen token works until it expires. Disabling the user is the emergency stop.
+- `sessionStorage` is readable by any script on the page, so an XSS bug would expose the token. A httpOnly cookie plus CSRF protection would be stronger.
+- No password reset or change, MFA, or account lockout (only the sign-in rate limit).
+- No TLS: it must be terminated by whatever hosts the app. `SECRET_KEY`, user accounts and the database file are the operator's to protect.
+- The reaper marks a stuck job `FAILED` but cannot stop the training call itself, so a stuck job can still occupy the worker. Per-job CPU, memory and wall-clock limits need process isolation.
+- Audit events are write-only: nothing reads them, there is no retention policy, and a sign-in failure stores the attempted username.
+- Deleting a dataset removes files after the database commit; a failure there leaves unreachable files rather than failing the request.
+- Single models cannot be deleted on their own; deleting the dataset removes them.

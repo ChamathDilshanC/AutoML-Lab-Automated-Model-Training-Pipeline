@@ -1,6 +1,6 @@
 # API Specification
 
-> **Status:** **Proposed**, except `GET /health`, the dataset routes (§ 4.1), the experiment routes (§ 4.2, § 4.3) and the model routes (§ 4.4), which are implemented (M1, M2, M4, M5). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
+> **Status:** **Proposed**, except `GET /health`, the auth routes (§ 4.0), the dataset routes (§ 4.1), the experiment routes (§ 4.2, § 4.3) and the model routes (§ 4.4), which are implemented (M1, M2, M4, M5, M7). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
 
 Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -8,7 +8,7 @@ Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.
 - Base path: `/api/v1`. Breaking changes require a new version prefix (`/api/v2`).
 - JSON request and response bodies (`Content-Type: application/json`), except the direct file upload target.
 - Every response carries a request ID (header `X-Request-ID`, echoed in error bodies) for log correlation.
-- Authentication: required on all routes except `GET /health`. Mechanism **TBD** ([SECURITY.md](SECURITY.md)).
+- Authentication: a bearer token (`Authorization: Bearer <token>`) is required on every route except `GET /health` and `POST /api/v1/auth/login` (§ 4.0). A missing, malformed, expired, forged or no-longer-valid token returns `401 UNAUTHENTICATED` with `WWW-Authenticate: Bearer`, before the request body is looked at.
 - Ownership: a caller can only access resources they own; foreign resources return `404` (not `403`) to avoid confirming existence.
 - Identifiers are opaque strings; clients must not parse them.
 
@@ -50,7 +50,7 @@ Errors never include stack traces, storage keys, credentials or dataset values.
 | `POST` | `/api/v1/models/{model_id}/predict` | Run inference using an approved model. **Implemented** | FR-050–FR-053 |
 | `GET` | `/health` | Liveness/health check. **Implemented**, returns `{"status": "ok"}` | FR-062 |
 
-`GET /api/v1/experiments/options` (§ 4.2) and `POST /api/v1/models/{model_id}/approve` (§ 4.4) are additions to the brief that were implemented in M4 and M5.
+`GET /api/v1/experiments/options` (§ 4.2), `POST /api/v1/models/{model_id}/approve` and `/revoke` (§ 4.4), `DELETE /api/v1/datasets/{dataset_id}` (§ 4.1) and the auth routes (§ 4.0) are additions to the brief that were implemented in M4, M5 and M7.
 
 ### 3.1 Candidate additions (not in the brief — **Open**)
 These are implied by PRD requirements but not yet agreed.
@@ -58,11 +58,19 @@ These are implied by PRD requirements but not yet agreed.
 | Method | Route | Why |
 |---|---|---|
 | `GET` | `/api/v1/datasets` | Dataset list screen |
-| `DELETE` | `/api/v1/datasets/{dataset_id}` | FR-006 retention/deletion |
 | `GET` | `/api/v1/experiments` | Experiments list/dashboard |
 | `POST` | `/api/v1/experiments/{experiment_id}/cancel` | FR-015 (if cancellation is in scope) |
 
 ## 4. Payload sketches (Proposed — field names may change)
+
+### 4.0 Auth routes (**Implemented**, M7)
+There is no public sign-up; accounts are created with `python -m app.cli create-user` ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)).
+
+**`POST /api/v1/auth/login`** takes `application/x-www-form-urlencoded` `username` and `password` (the OAuth2 password form) and returns `{ "access_token": "...", "token_type": "bearer", "expires_in": 3600 }`. Usernames are case-insensitive. A wrong password, an unknown user and a disabled user all return the same `401` message, "Incorrect username or password.". Attempts are limited per client address (default 10 per minute, **proposed**); beyond that the answer is `429 RATE_LIMITED` with `Retry-After`, even for a correct password.
+
+**`GET /api/v1/auth/me`** returns `{ user_id, username }` for the token's user.
+
+Tokens are signed JWTs (HS256), valid for 60 minutes by default. The user is looked up on every request, so disabling or deleting an account ends its tokens immediately. There are no refresh tokens and no server-side logout.
 
 ### 4.1 Dataset routes (**Implemented**, M2)
 In local mode the file goes through the backend. A presigned direct-to-S3 upload (the original `PENDING_UPLOAD` flow) is deferred to the AWS milestone (M6).
@@ -79,6 +87,8 @@ In local mode the file goes through the backend. A presigned direct-to-S3 upload
 - Warning codes: `tiny_dataset`, `constant_column`, `high_missing`, `identifier_like`, `high_cardinality`, `duplicate_rows`.
 
 **`GET /api/v1/datasets/{dataset_id}`** — dataset metadata with `validation` set once the dataset has been validated (`null` while `UPLOADED`).
+
+**`DELETE /api/v1/datasets/{dataset_id}`** (M7) returns `204` after deleting the dataset and everything derived from it: its experiments, runs and models, and the stored files (source CSV and model artifacts). Database rows are removed first in one transaction; file removal follows, and a failure there is logged but does not fail the request (the files are then unreachable, not referenced). `409 STATE_CONFLICT` while one of its experiments is `RUNNING`. Deleting twice gives `404`.
 
 Dataset statuses: `UPLOADED` (stored, not validated), `READY`, `REJECTED`. Unknown or other owners' datasets return `404 NOT_FOUND`.
 
@@ -121,12 +131,15 @@ A model is registered automatically when an experiment succeeds ([ADR 0003](ADR/
 `{ model_id, version, dataset_id, dataset_filename, experiment_id, run_id, task, target_column, algorithm, metric, metrics, hyperparameters, feature_schema, classes, library_versions, artifact_bytes, approval_status, approved_at, created_at }`.
 `feature_schema` is a list of `{ name, kind, value_type, categories }` where `value_type` is `number`, `string` or `boolean` and `categories` lists the values seen in training for string columns with at most 50 distinct values (otherwise `null`). `metrics` are the winner's held-out test scores.
 
-**`POST /api/v1/models/{model_id}/approve`** with body `{ "confirm": true }` sets `approval_status` to `APPROVED` (it starts as `PENDING`). Any other body is `422`. Approving an approved model changes nothing. There is no revoke route yet.
+**`POST /api/v1/models/{model_id}/approve`** with body `{ "confirm": true }` sets `approval_status` to `APPROVED` (it starts as `PENDING`). Any other body is `422`. Approving an approved model changes nothing. Approving a `REVOKED` model is `409`.
+
+**`POST /api/v1/models/{model_id}/revoke`** (M7) with body `{ "confirm": true }` sets `REVOKED`. The model stops answering predictions at once (the approval is checked in the database on every request, so a cached pipeline does not matter). `REVOKED` is terminal: it cannot be approved again, and a new experiment gives a new version. Revoking a `PENDING` model is `409`; revoking a revoked one is a no-op.
 
 **`POST /api/v1/models/{model_id}/predict`** with body `{ "instances": [ { "<feature>": <value>, ... } ] }`:
 - `409 STATE_CONFLICT` if the model is not `APPROVED`, or if it was trained with a different scikit-learn version than the one installed.
 - `422 VALIDATION_ERROR` with `details` like `{ "field": "instances[1].x2", "issue": "required field is missing" }`. Each instance must contain exactly the schema's fields: unknown and missing fields are rejected; a number must be a finite JSON number (not a string or boolean); a string field must be a string of at most 200 characters; a boolean field must be `true` or `false`. `null` is accepted for any field and is imputed from training statistics. A category not seen in training is accepted (the encoder ignores it). At most `MAX_PREDICTION_BATCH` instances (default 100, **proposed**). Details never contain submitted values.
 - `200` with `{ model_id, model_version, predictions, classes, probabilities, request_id }`. `probabilities` (one object per instance, keyed by class label) and `classes` are only present for classification.
+- `429 RATE_LIMITED` with `Retry-After` after too many requests: a token bucket of `PREDICT_RATE_LIMIT_PER_MINUTE` (default 60, **proposed**) per signed-in user, shared by all models. It is checked before the body is read and counts malformed, unknown-model and unapproved requests too; unauthenticated requests are refused with `401` first and do not use it.
 - `500 INTERNAL_ERROR` if the artifact is missing or fails its checksum; the message is generic.
 - Input is plain JSON validated field by field. It is never passed to joblib or pickle; only the stored artifact is deserialised, after its SHA-256 matches.
 
@@ -134,7 +147,7 @@ A model is registered automatically when an experiment succeeds ([ADR 0003](ADR/
 List endpoints (once defined) use cursor or `limit`/`offset` pagination with a documented maximum page size — style **TBD**. Models are versioned independently of the API version.
 
 ## 6. Rate limiting
-Required before the prediction endpoint is publicly exposed; limits **TBD**. Responses use `429` with `Retry-After`.
+**Implemented (M7)** for `POST /auth/login` (per client address, `LOGIN_RATE_LIMIT_PER_MINUTE`, default 10) and `POST /models/{id}/predict` (per user, `PREDICT_RATE_LIMIT_PER_MINUTE`, default 60). Over the limit the answer is `429 RATE_LIMITED` with `Retry-After`. The limiter is in memory, so each API process keeps its own counts; a shared store or a gateway limit is needed once there is more than one process.
 
 ## 7. Open questions
 Auth scheme for the API; list/delete/cancel/approve endpoints (§ 3.1); pagination style; whether predictions accept CSV in addition to JSON.

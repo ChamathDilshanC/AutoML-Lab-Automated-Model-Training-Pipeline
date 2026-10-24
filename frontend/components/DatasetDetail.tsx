@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import DataQualityReport from "@/components/DataQualityReport";
-import { errorMessage, getDataset, validateDataset } from "@/lib/api";
+import { deleteDataset, errorMessage, getDataset, validateDataset } from "@/lib/api";
 import type { Dataset } from "@/lib/types";
 
 type View =
@@ -12,7 +14,11 @@ type View =
   | { phase: "ready"; dataset: Dataset };
 
 export default function DatasetDetail({ datasetId }: { datasetId: string }) {
+  const router = useRouter();
   const [view, setView] = useState<View>({ phase: "loading" });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [validating, setValidating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -37,6 +43,18 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
       setActionError(errorMessage(err));
     } finally {
       setValidating(false);
+    }
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteDataset(datasetId);
+      router.push("/datasets/new");
+    } catch (err) {
+      setDeleteError(errorMessage(err));
+      setDeleting(false);
     }
   }
 
@@ -85,6 +103,36 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
           {actionError}
         </p>
       )}
+      <div className="border-t border-border pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteError(null);
+            setConfirmingDelete(true);
+          }}
+          className="rounded-md border border-danger px-4 py-2 font-medium text-danger"
+        >
+          Delete dataset
+        </button>
+      </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this dataset?"
+        confirmLabel="Delete dataset"
+        busyLabel="Deleting…"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={remove}
+        onCancel={() => setConfirmingDelete(false)}
+      >
+        <p>
+          This permanently deletes <strong className="break-all">{view.dataset.original_filename}</strong>{" "}
+          and everything made from it: its experiments, their results, and its models (including
+          approved ones), together with all stored files.
+        </p>
+        <p className="font-medium">This cannot be undone.</p>
+      </ConfirmDialog>
     </div>
   );
 }

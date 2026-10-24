@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import PredictionForm from "@/components/PredictionForm";
 import StatusBadge from "@/components/StatusBadge";
-import { approveModel, errorMessage, getModel } from "@/lib/api";
+import { approveModel, errorMessage, getModel, revokeModel } from "@/lib/api";
 import { algorithmLabel, formatNumber, metricLabel } from "@/lib/format";
 import type { FeatureSpec, RegisteredModel } from "@/lib/types";
 
@@ -23,8 +24,8 @@ function formatBytes(bytes: number): string {
 
 export default function ModelDetail({ modelId }: { modelId: string }) {
   const [view, setView] = useState<View>({ phase: "loading" });
-  const [confirming, setConfirming] = useState(false);
-  const [approving, setApproving] = useState(false);
+  const [dialog, setDialog] = useState<"approve" | "revoke" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,17 +38,22 @@ export default function ModelDetail({ modelId }: { modelId: string }) {
     return () => controller.abort();
   }, [modelId]);
 
-  async function approve() {
-    setApproving(true);
+  function openDialog(kind: "approve" | "revoke") {
+    setActionError(null);
+    setDialog(kind);
+  }
+
+  async function perform(kind: "approve" | "revoke") {
+    setBusy(true);
     setActionError(null);
     try {
-      const model = await approveModel(modelId);
+      const model = kind === "approve" ? await approveModel(modelId) : await revokeModel(modelId);
       setView({ phase: "ready", model });
-      setConfirming(false);
+      setDialog(null);
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {
-      setApproving(false);
+      setBusy(false);
     }
   }
 
@@ -95,55 +101,76 @@ export default function ModelDetail({ modelId }: { modelId: string }) {
         </p>
       </header>
 
-      {model.approval_status === "PENDING" && (
-        <section aria-labelledby="approve-title" className="flex flex-col gap-3 rounded-md border border-warning p-4">
-          <h2 id="approve-title" className="font-semibold">
-            Approval
-          </h2>
-          <p>This model cannot make predictions until it is approved.</p>
-          {!confirming ? (
+      <section aria-labelledby="approval-title" className="flex flex-col gap-3 rounded-md border border-border p-4">
+        <h2 id="approval-title" className="font-semibold">
+          Approval
+        </h2>
+        {model.approval_status === "PENDING" && (
+          <>
+            <p>This model cannot make predictions until it is approved.</p>
             <div>
               <button
                 type="button"
-                onClick={() => setConfirming(true)}
+                onClick={() => openDialog("approve")}
                 className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent"
               >
                 Approve model
               </button>
             </div>
-          ) : (
-            <div role="group" aria-label="Confirm approval" className="flex flex-col gap-2">
-              <p className="font-medium">
-                Approve version {model.version} for predictions? It cannot be un-approved from this
-                page.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={approve}
-                  disabled={approving}
-                  className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60"
-                >
-                  {approving ? "Approving…" : "Yes, approve"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  disabled={approving}
-                  className="rounded-md border border-border px-4 py-2 font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
+          </>
+        )}
+        {model.approval_status === "APPROVED" && (
+          <>
+            <p>This model is approved and can make predictions.</p>
+            <div>
+              <button
+                type="button"
+                onClick={() => openDialog("revoke")}
+                className="rounded-md border border-danger px-4 py-2 font-medium text-danger"
+              >
+                Revoke approval
+              </button>
             </div>
-          )}
-          {actionError && (
-            <p role="alert" className="rounded-md border border-danger p-3 text-danger">
-              {actionError}
-            </p>
-          )}
-        </section>
-      )}
+          </>
+        )}
+        {model.approval_status === "REVOKED" && (
+          <p>
+            Approval was revoked, so this version can no longer make predictions. Run a new
+            experiment on the dataset to create a new version.
+          </p>
+        )}
+      </section>
+
+      <ConfirmDialog
+        open={dialog === "approve"}
+        title={`Approve version ${model.version}?`}
+        confirmLabel="Yes, approve"
+        busyLabel="Approving…"
+        busy={busy}
+        error={dialog === "approve" ? actionError : null}
+        onConfirm={() => perform("approve")}
+        onCancel={() => setDialog(null)}
+      >
+        <p>Approving lets this model answer prediction requests from this account.</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "revoke"}
+        title={`Revoke version ${model.version}?`}
+        confirmLabel="Revoke model"
+        busyLabel="Revoking…"
+        destructive
+        busy={busy}
+        error={dialog === "revoke" ? actionError : null}
+        onConfirm={() => perform("revoke")}
+        onCancel={() => setDialog(null)}
+      >
+        <p>The model stops answering predictions immediately.</p>
+        <p className="font-medium">
+          This cannot be undone. A revoked version cannot be approved again; you would run a new
+          experiment to get a new version.
+        </p>
+      </ConfirmDialog>
 
       <section aria-labelledby="metrics-title" className="flex flex-col gap-3">
         <h2 id="metrics-title" className="text-xl font-semibold">

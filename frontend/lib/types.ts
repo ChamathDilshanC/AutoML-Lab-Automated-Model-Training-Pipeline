@@ -117,7 +117,7 @@ export interface Leaderboard {
   library_versions: Record<string, string> | null;
 }
 
-export type ApprovalStatus = "PENDING" | "APPROVED";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REVOKED";
 
 export interface FeatureSpec {
   name: string;
@@ -157,4 +157,15 @@ export interface PredictionResponse {
   classes: (string | number | boolean)[] | null;
   probabilities: Record<string, number>[] | null;
   request_id: string | null;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+}
+
+export interface CurrentUser {
+  user_id: string;
+  username: string;
 }

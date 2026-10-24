@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 to M5 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker a leaderboard, a model registry with approval, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). Authentication, rate limiting, deletion and retention, and cloud deployment are **not implemented**. Check the tree before assuming anything else exists.
+**Current state: M1 to M5 and M7 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction, security and reliability).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker, a leaderboard, a model registry with approval and revocation, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite, behind sign-in with per-user ownership, rate limits, dataset deletion and an abandoned-job reaper. Cloud deployment (M6, M8) is **not implemented**, and neither are password reset, MFA or server-side logout (see `docs/SECURITY.md` § 15). Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).
@@ -43,6 +43,7 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 | Backend format check | `ruff format --check .` | `backend/` |
 | Backend type-check | `mypy` | `backend/` |
 | Backend test | `pytest` | `backend/` |
+| Create a user (no public sign-up) | `python -m app.cli create-user <name>` | `backend/` |
 | Backend run | `uvicorn app.main:app --reload` | `backend/` |
 | Worker run (second terminal) | `python -m worker.main` (`--once` processes at most one job) | `backend/` |
 | Frontend install | `npm ci` | `frontend/` |
@@ -66,6 +67,9 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 - Treat uploaded files as untrusted. Enforce size/row/column limits and ownership checks.
 - Do not log raw dataset rows, tokens or credentials. Do not return stack traces, storage keys or dataset values in API errors.
 - Prefer IAM roles / temporary credentials; scope permissions per component.
+- **Every `/api/v1` route needs a signed-in user.** Add new routers under `protected` in `backend/app/api/v1/router.py`; the route-walk test in `tests/test_auth.py` fails if one is left open. Take the owner from `get_owner_id`, filter every query by it, and return `404` (never `403`) for another user's ID.
+- `SECRET_KEY` is never committed or logged. Never log passwords, tokens or request bodies, and keep audit details free of secrets.
+- Security tests must use real tokens. Do not add an authentication bypass to fixtures or an environment switch that disables checks.
 
 ## 8. Dependencies and API changes
 - Add dependencies only with a stated reason; pin via lockfiles; run dependency scans once CI exists.

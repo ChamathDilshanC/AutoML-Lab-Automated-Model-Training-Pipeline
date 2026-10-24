@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import DatasetDetail from "@/components/DatasetDetail";
 
+// Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
+export const instant = false;
+
 export const metadata = { title: "Dataset · AutoML Lab" };
 
 async function DatasetView({ params }: { params: Promise<{ id: string }> }) {

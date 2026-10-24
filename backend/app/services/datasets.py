@@ -1,16 +1,23 @@
 """Dataset upload and validation workflow."""
 
+import logging
 import os
 import re
 import uuid
 from dataclasses import asdict
+from pathlib import PurePosixPath
 from typing import BinaryIO
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
 from app.core.time import as_utc
-from app.db.datasets import create_dataset, save_dataset
+from app.db.datasets import (
+    create_dataset,
+    delete_dataset_cascade,
+    has_running_experiment,
+    save_dataset,
+)
 from app.db.models import Dataset
 from app.schemas.datasets import (
     ColumnSummary,
@@ -19,9 +26,12 @@ from app.schemas.datasets import (
     QualityWarning,
     ValidationReport,
 )
+from app.services.models import evict_models
 from app.services.storage import FileTooLargeError, StorageAdapter
 from automl.quality import quality_warnings, summarize_schema
 from automl.validation import DataValidationError, ValidationLimits, read_csv_bytes
+
+logger = logging.getLogger(__name__)
 
 MAX_FILENAME_LENGTH = 255
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
@@ -112,6 +122,29 @@ def validate_dataset(
         dataset.schema_summary = [asdict(column) for column in summarize_schema(df)]
         dataset.quality_warnings = [asdict(warning) for warning in quality_warnings(df)]
     return save_dataset(session, dataset)
+
+
+def delete_dataset(session: Session, storage: StorageAdapter, dataset: Dataset) -> None:
+    """Delete a dataset, its experiments, runs and models, and every stored file.
+
+    Refused while one of its experiments is running, because the worker is using the files.
+    Database rows go first, in one transaction; files are removed afterwards, so a failure there
+    leaves unreachable files, never a record pointing at missing ones.
+    """
+    if has_running_experiment(session, dataset.dataset_id):
+        raise ApiError(
+            409,
+            "STATE_CONFLICT",
+            "An experiment on this dataset is running. Delete it after the experiment finishes.",
+        )
+    dataset_folder = str(PurePosixPath(dataset.storage_key).parent)
+    model_ids = delete_dataset_cascade(session, dataset)
+    evict_models(model_ids)
+    for prefix in [dataset_folder, *(f"models/{model_id}" for model_id in model_ids)]:
+        try:
+            storage.delete_prefix(prefix)
+        except Exception:
+            logger.exception("Could not remove stored files under %s", prefix)
 
 
 def to_report(dataset: Dataset) -> ValidationReport | None:

@@ -13,6 +13,7 @@ const STATUS: Record<BadgeStatus, { label: string; icon: string; color: string }
   FAILED: { label: "Failed", icon: "✕", color: "text-danger" },
   PENDING: { label: "Pending approval", icon: "○", color: "text-warning" },
   APPROVED: { label: "Approved", icon: "✓", color: "text-success" },
+  REVOKED: { label: "Revoked", icon: "✕", color: "text-danger" },
 };
 
 /** Status is conveyed by text and icon as well as colour. */

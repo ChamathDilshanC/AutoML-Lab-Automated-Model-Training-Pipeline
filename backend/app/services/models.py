@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
 from app.core.time import as_utc
+from app.db import registry as repo
 from app.db.models import Dataset, RegisteredModel
 from app.schemas.models import (
     ApprovalStatus,
@@ -34,6 +35,35 @@ _cache_lock = threading.Lock()
 def clear_model_cache() -> None:
     with _cache_lock:
         _cache.clear()
+
+
+def evict_models(model_ids: list[str]) -> None:
+    """Forget loaded pipelines of deleted models."""
+    with _cache_lock:
+        for model_id in model_ids:
+            _cache.pop(model_id, None)
+
+
+def approve(session: Session, model: RegisteredModel) -> RegisteredModel:
+    """`PENDING` becomes `APPROVED`; repeating it changes nothing; a revoked model stays revoked."""
+    if model.approval_status == ApprovalStatus.REVOKED:
+        raise ApiError(
+            409,
+            "STATE_CONFLICT",
+            "A revoked model cannot be approved again. Run a new experiment for a new version.",
+        )
+    if model.approval_status == ApprovalStatus.APPROVED:
+        return model
+    return repo.set_approval(session, model, ApprovalStatus.APPROVED)
+
+
+def revoke(session: Session, model: RegisteredModel) -> RegisteredModel:
+    """`APPROVED` becomes `REVOKED` and stops serving predictions immediately."""
+    if model.approval_status == ApprovalStatus.REVOKED:
+        return model
+    if model.approval_status != ApprovalStatus.APPROVED:
+        raise ApiError(409, "STATE_CONFLICT", "Only an approved model can be revoked.")
+    return repo.set_approval(session, model, ApprovalStatus.REVOKED)
 
 
 def filenames_for(session: Session, models: list[RegisteredModel]) -> dict[str, str]:
@@ -99,6 +129,8 @@ def predict(
     request_id: str | None,
 ) -> PredictionResponse:
     """Validate the input against the model's schema, then run the approved model."""
+    if model.approval_status == ApprovalStatus.REVOKED:
+        raise ApiError(409, "STATE_CONFLICT", "This model's approval was revoked.")
     if model.approval_status != ApprovalStatus.APPROVED:
         raise ApiError(409, "STATE_CONFLICT", "The model is not approved for predictions.")
     if len(instances) > max_batch:

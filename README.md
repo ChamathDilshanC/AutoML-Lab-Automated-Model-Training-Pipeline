@@ -7,13 +7,14 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Milestones M1 to M5 are in place: upload a CSV, review its data-quality report, configure an experiment, watch a separate worker train the candidate models and rank them on a leaderboard, then approve the winning model and get predictions from it in the browser or over the API. Authentication, rate limiting and cloud deployment are not implemented yet. See the [roadmap](docs/ROADMAP.md).
+Milestones M1 to M5 are in place: upload a CSV, review its data-quality report, configure an experiment, watch a separate worker train the candidate models and rank them on a leaderboard, then approve the winning model and get predictions from it in the browser or over the API. Sign-in with per-user ownership, dataset deletion, model revocation and rate limiting (M7) are in place; cloud deployment is not. See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start (local)
 ```bash
 # Backend (Python 3.11+)
 cd backend
 pip install -e ".[dev]"
+python -m app.cli create-user alice   # asks for a password (12+ characters); no public sign-up
 uvicorn app.main:app --reload      # http://localhost:8000/health
 
 # Worker (second terminal; runs queued experiments)
@@ -25,7 +26,7 @@ cd frontend
 npm ci
 npm run dev                        # http://localhost:3000
 ```
-Copy `.env.example` to `.env` only if you need to override defaults; the variable names are listed there. `docker compose up` is also defined but has not been tested yet.
+Copy `.env.example` to `.env` only if you need to override defaults; the variable names are listed there. Set `SECRET_KEY` (32+ random characters) to keep sign-ins across API restarts; it is required whenever `ENVIRONMENT` is not `local`. Then sign in at http://localhost:3000. `docker compose up` is also defined but has not been tested yet.
 
 ## Documentation
 Start at the [documentation index](docs/README.md):

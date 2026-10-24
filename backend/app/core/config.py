@@ -17,10 +17,16 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024
     # Worker settings. Both values are proposed defaults.
     worker_poll_seconds: float = 2.0
-    job_timeout_seconds: int = 3600
+    job_timeout_seconds: int = 1800
+    reaper_interval_seconds: float = 60.0
     # Model limits, also proposed defaults.
     max_prediction_batch: int = 100
     max_artifact_bytes: int = 200 * 1024 * 1024
+    # Authentication and abuse limits (proposed defaults).
+    secret_key: str | None = None
+    access_token_minutes: int = 60
+    predict_rate_limit_per_minute: int = 60
+    login_rate_limit_per_minute: int = 10
     cors_origins: list[str] = ["http://localhost:3000"]
 
 
