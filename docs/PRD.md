@@ -43,8 +43,11 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | FR-062 `GET /health` | **Implemented (M1)** |
 | FR-001, FR-002, FR-003 | **Implemented (M2)**: multipart upload through the backend to private local storage; validation to `READY`/`REJECTED` |
 | FR-004, FR-005 | **Partly implemented (M2)**: schema, missing values and data-quality warnings; no first-rows preview and no target-leakage warning yet (the target is chosen at experiment time) |
-| FR-020, FR-021, FR-022, FR-024, FR-026, FR-027, FR-030 | **Implemented in the ML engine (M3)**; not yet reachable through the API or UI |
-| FR-023, FR-025 | **Partly implemented (M3)**: hyper-parameters, metrics, split strategy, seed and library versions are recorded; run duration/status are M4 |
+| FR-020, FR-021, FR-022, FR-024, FR-026, FR-027, FR-030 | **Implemented** in the ML engine (M3) and run by the worker since M4 |
+| FR-023, FR-025 | **Implemented (M3, M4)**: per-run hyper-parameters, metrics, duration and status, plus split strategy, seed and library versions, are recorded |
+| FR-010, FR-011, FR-012, FR-013, FR-014 | **Implemented (M4)**: experiment configuration and validation, queueing, idempotent submission, status and error display |
+| FR-031, FR-032 | **Implemented (M4)**: leaderboard with all metrics and a selection explanation, and a real-world performance caveat |
+| FR-015, FR-016, FR-033 | Not implemented (cancellation, time-aware split, metric charts) |
 | All other features in this PRD | Proposed |
 
 ## 6. MVP scope (Definition of Done for the first portfolio release)

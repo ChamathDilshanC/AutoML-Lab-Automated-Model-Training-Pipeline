@@ -1,23 +1,14 @@
 """API tests for the dataset workflow (upload, validate, read)."""
 
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_storage
-from app.core.config import get_settings
 from app.core.security import get_owner_id
-from app.db.session import Base, get_session
-from app.main import create_app
 from app.services.datasets import sanitize_filename
-
-UPLOAD_LIMIT = 20_000
 
 
 def make_csv(rows: int = 30) -> bytes:
@@ -25,34 +16,6 @@ def make_csv(rows: int = 30) -> bytes:
     for i in range(rows):
         lines.append(f"{20 + i},{30000 + 500 * i},{('Paris', 'Rome', 'Oslo')[i % 3]},{i % 2}")
     return ("\n".join(lines) + "\n").encode()
-
-
-@pytest.fixture
-def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FastAPI]:
-    monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path / "storage"))
-    monkeypatch.setenv("MAX_UPLOAD_BYTES", str(UPLOAD_LIMIT))
-    get_settings.cache_clear()
-    application = create_app()
-
-    engine = create_engine(
-        "sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
-    )
-    Base.metadata.create_all(engine)
-    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
-
-    def override_session() -> Iterator:
-        with session_factory() as session:
-            yield session
-
-    application.dependency_overrides[get_session] = override_session
-    yield application
-    engine.dispose()
-    get_settings.cache_clear()
-
-
-@pytest.fixture
-def client(app: FastAPI) -> TestClient:
-    return TestClient(app, raise_server_exceptions=False)
 
 
 def upload(client: TestClient, content: bytes, filename: str = "data.csv"):

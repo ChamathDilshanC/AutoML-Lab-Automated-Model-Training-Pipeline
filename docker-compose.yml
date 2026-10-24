@@ -14,6 +14,18 @@ services:
       - ./backend:/app
       - backend-data:/data
 
+  # Separate process from the API: it polls the shared database for queued experiments.
+  worker:
+    build: ./backend
+    command: python -m worker.main
+    environment:
+      ENVIRONMENT: local
+      DATABASE_URL: sqlite:////data/automl.db
+      ARTIFACT_DIR: /data/artifacts
+    volumes:
+      - ./backend:/app
+      - backend-data:/data
+
   frontend:
     build: ./frontend
     environment:

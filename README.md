@@ -7,7 +7,7 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Milestones M1 (foundation), M3 (ML engine) and M2 (dataset workflow) are in place: you can upload a CSV in the web UI, have it validated, and see its schema and data-quality warnings. Experiments, the model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
+Milestones M1 to M4 are in place: upload a CSV, review its data-quality report, configure an experiment, and watch a separate worker train the candidate models and rank them on a leaderboard. The model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start (local)
 ```bash
@@ -15,6 +15,10 @@ Milestones M1 (foundation), M3 (ML engine) and M2 (dataset workflow) are in plac
 cd backend
 pip install -e ".[dev]"
 uvicorn app.main:app --reload      # http://localhost:8000/health
+
+# Worker (second terminal; runs queued experiments)
+cd backend
+python -m worker.main
 
 # Frontend (Node 20.9+; developed with Node 24)
 cd frontend

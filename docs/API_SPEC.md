@@ -1,6 +1,6 @@
 # API Specification
 
-> **Status:** **Proposed**, except `GET /health` and the three dataset routes (§ 4.1), which are implemented (M1, M2). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
+> **Status:** **Proposed**, except `GET /health`, the dataset routes (§ 4.1) and the experiment routes (§ 4.2, § 4.3), which are implemented (M1, M2, M4). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
 
 Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -42,13 +42,15 @@ Errors never include stack traces, storage keys, credentials or dataset values.
 | `POST` | `/api/v1/datasets` | Upload a dataset as multipart form data. **Implemented** | FR-001, FR-002 |
 | `GET` | `/api/v1/datasets/{dataset_id}` | Get dataset metadata and validation report. **Implemented** | FR-004 |
 | `POST` | `/api/v1/datasets/{dataset_id}/validate` | Validate uploaded CSV. **Implemented** | FR-003 |
-| `POST` | `/api/v1/experiments` | Create and queue an experiment | FR-010–FR-012 |
-| `GET` | `/api/v1/experiments/{experiment_id}` | Get status and configuration | FR-014 |
-| `GET` | `/api/v1/experiments/{experiment_id}/results` | Get model comparison results | FR-030, FR-031 |
+| `POST` | `/api/v1/experiments` | Create and queue an experiment. **Implemented** | FR-010–FR-013 |
+| `GET` | `/api/v1/experiments/{experiment_id}` | Get status and configuration. **Implemented** | FR-014 |
+| `GET` | `/api/v1/experiments/{experiment_id}/results` | Get model comparison results. **Implemented** | FR-030, FR-031 |
 | `GET` | `/api/v1/models` | List registered models | FR-043 |
 | `GET` | `/api/v1/models/{model_id}` | Get model metadata and metrics | FR-043 |
 | `POST` | `/api/v1/models/{model_id}/predict` | Run inference using an approved model | FR-050–FR-053 |
 | `GET` | `/health` | Liveness/health check. **Implemented**, returns `{"status": "ok"}` | FR-062 |
+
+`GET /api/v1/experiments/options` is an addition to the brief that M4 implemented (§ 4.2).
 
 ### 3.1 Candidate additions (not in the brief — **Open**)
 These are implied by PRD requirements but not yet agreed.
@@ -81,22 +83,37 @@ In local mode the file goes through the backend. A presigned direct-to-S3 upload
 
 Dataset statuses: `UPLOADED` (stored, not validated), `READY`, `REJECTED`. Unknown or other owners' datasets return `404 NOT_FOUND`.
 
-### 4.2 `POST /api/v1/experiments`
+### 4.2 Experiment routes (**Implemented**, M4)
+The API only queues work. A separate worker process trains the models (see [ARCHITECTURE § 6.6](ARCHITECTURE.md#66-job-orchestration)), so no request waits for training.
+
+**`GET /api/v1/experiments/options`** returns, for `classification` and `regression`, the allowlisted `algorithms`, the `metrics` (`name`, `higher_is_better`) and the `default_metric`. Clients use it instead of hard-coding the allowlist. Declared before `/{experiment_id}` so `options` is not read as an ID.
+
+**`POST /api/v1/experiments`** with a JSON body:
 ```json
 {
-  "dataset_id": "...",
+  "dataset_id": "ds_...",
   "task": "classification",
-  "target_column": "churned",
+  "target_column": "label",
   "metric": "f1",
   "algorithms": ["logistic_regression", "random_forest"],
   "random_seed": 42,
-  "split": { "strategy": "stratified_random", "test_size": 0.2 }
+  "test_size": 0.2
 }
 ```
-Response `202` with `status: "QUEUED"`. Algorithm identifiers are an **allowlisted enum**; unknown values return `422`.
+- `metric` is optional (default `f1` for classification, `rmse` for regression). `random_seed` defaults to 42 and `test_size` to 0.2 (allowed 0.05 to 0.5). Duplicate algorithms are collapsed in order.
+- Returns `202` with the experiment, `status: "QUEUED"`.
+- `404` for an unknown or foreign dataset; `409 STATE_CONFLICT` unless the dataset is `READY`.
+- `422 VALIDATION_ERROR` with `details` naming the field: the target is not in the dataset, has missing values, has fewer than two distinct values, or is not numeric for regression; the metric does not fit the task; an algorithm is not on the allowlist. Checks that need the data itself (for example a class with a single row) happen in the worker, which fails the experiment with a safe message.
+- Optional `Idempotency-Key` header (up to 128 characters): repeating a request with the same key and owner returns the first experiment instead of creating another. The body of a repeated request is not compared. The browser sends this header, so the CORS configuration allows it.
 
-### 4.3 `GET /api/v1/experiments/{id}/results`
-Returns the ranked runs with all metrics, durations, per-run status, the selected run, and a machine-readable `selection_reason` (metric, direction, tie-breakers applied).
+**`GET /api/v1/experiments/{id}`** returns the experiment: configuration, `status`, `created_at`, `started_at`, `finished_at` (UTC) and `error_summary` (safe text). Statuses: `CREATED` (reserved), `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`. There is no cancel route and no `CANCELLED` status yet.
+
+### 4.3 Results (**Implemented**, M4)
+**`GET /api/v1/experiments/{id}/results`** returns `409 STATE_CONFLICT` until the experiment is `SUCCEEDED` or `FAILED`, then:
+- `runs`: ranked runs best first, then successful but unranked runs, then failed runs. Each run has `algorithm`, `status`, `rank`, `metrics` (all metrics for the task; a metric that could not be computed is `null`), `cv_score` (cross-validated primary metric on training data, `null` when nothing was tuned), `cv_folds`, `hyperparameters` (tuned values), `duration_seconds` and `error_summary` (generic text for failed runs).
+- `metric`, `higher_is_better`, `selected_run_id`, and `selection_reason`: `{ metric, direction, evaluated_on: "held_out_test_set", tie_breaker: "algorithm_name" }`. Both are `null` when no run could be ranked.
+- `split` (strategy, test size, seed, train and test row counts) and `library_versions`.
+- Ranking uses the held-out test score of the chosen metric, in the metric's direction; ties are broken by algorithm name.
 
 ### 4.4 `POST /api/v1/models/{model_id}/predict`
 Request: `{ "instances": [ { "<feature>": <value>, ... } ] }`

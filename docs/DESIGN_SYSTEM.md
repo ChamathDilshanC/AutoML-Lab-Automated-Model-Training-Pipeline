@@ -1,8 +1,8 @@
 # Design System
 
-> **Status:** only the dataset pages exist (M2); everything else here is **Proposed**. Tokens listed are starting values to be implemented as CSS variables / theme tokens in the Next.js app; none of them exist in code today. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
+> **Status:** only the dataset and experiment pages exist (M2, M4); everything else here is **Proposed**. Tokens listed are starting values to be implemented as CSS variables / theme tokens in the Next.js app; none of them exist in code today. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
 
-**Implemented (M2):** the colour tokens below are CSS variables in `frontend/app/globals.css` with a `prefers-color-scheme` dark theme (no manual override yet), plus `StatusBadge`, `DatasetUploader` and `DataQualityReport` and the routes `/datasets/new` and `/datasets/[id]`. Verified in a headless browser in light and dark; no automated UI tests yet.
+**Implemented (M2, M4):** the colour tokens below are CSS variables in `frontend/app/globals.css` with a `prefers-color-scheme` dark theme (no manual override yet), plus `StatusBadge` (dataset and experiment statuses), `DatasetUploader`, `DataQualityReport`, `ExperimentForm`, `ExperimentDetail` (polls every 2 seconds until the experiment finishes, announced through a polite live region) and `Leaderboard` (rank, best-run badge with text and icon, primary metric emphasised with a direction arrow, all metrics, failed runs listed separately), and the routes `/datasets/new`, `/datasets/[id]`, `/experiments/new` and `/experiments/[id]`. Verified in a headless browser in light and dark; no automated UI tests yet.
 
 Related: [PRD](PRD.md) · [Architecture § 6.1](ARCHITECTURE.md#61-nextjs-frontend)
 

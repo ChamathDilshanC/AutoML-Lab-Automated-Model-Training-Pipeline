@@ -4,12 +4,12 @@ import os
 import re
 import uuid
 from dataclasses import asdict
-from datetime import UTC
 from typing import BinaryIO
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
+from app.core.time import as_utc
 from app.db.datasets import create_dataset, save_dataset
 from app.db.models import Dataset
 from app.schemas.datasets import (
@@ -133,6 +133,6 @@ def to_response(dataset: Dataset) -> DatasetResponse:
         original_filename=dataset.original_filename,
         size_bytes=dataset.size_bytes,
         status=DatasetStatus(dataset.status),
-        created_at=dataset.created_at.replace(tzinfo=UTC),  # stored as naive UTC
+        created_at=as_utc(dataset.created_at),
         validation=to_report(dataset),
     )

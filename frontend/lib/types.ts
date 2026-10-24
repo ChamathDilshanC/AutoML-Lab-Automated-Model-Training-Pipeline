@@ -41,3 +41,77 @@ export interface ApiErrorBody {
     request_id: string | null;
   };
 }
+
+export type Task = "classification" | "regression";
+
+export type ExperimentStatus = "CREATED" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+
+export const TERMINAL_EXPERIMENT_STATUSES: ExperimentStatus[] = ["SUCCEEDED", "FAILED"];
+
+export interface MetricOption {
+  name: string;
+  higher_is_better: boolean;
+}
+
+export interface TaskOptions {
+  algorithms: string[];
+  metrics: MetricOption[];
+  default_metric: string;
+}
+
+export type ExperimentOptions = Record<Task, TaskOptions>;
+
+export interface ExperimentCreate {
+  dataset_id: string;
+  task: Task;
+  target_column: string;
+  metric: string;
+  algorithms: string[];
+  random_seed: number;
+  test_size: number;
+}
+
+export interface Experiment {
+  experiment_id: string;
+  dataset_id: string;
+  task: Task;
+  target_column: string;
+  metric: string;
+  algorithms: string[];
+  random_seed: number;
+  test_size: number;
+  status: ExperimentStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error_summary: string | null;
+}
+
+export interface ExperimentRun {
+  run_id: string;
+  algorithm: string;
+  status: "SUCCEEDED" | "FAILED";
+  hyperparameters: Record<string, unknown>;
+  cv_score: number | null;
+  cv_folds: number | null;
+  metrics: Record<string, number | null>;
+  duration_seconds: number;
+  error_summary: string | null;
+  rank: number | null;
+}
+
+export interface Leaderboard {
+  experiment: Experiment;
+  metric: string;
+  higher_is_better: boolean;
+  runs: ExperimentRun[];
+  selected_run_id: string | null;
+  selection_reason: {
+    metric: string;
+    direction: "higher_is_better" | "lower_is_better";
+    evaluated_on: string;
+    tie_breaker: string;
+  } | null;
+  split: { strategy: string; test_size: number; random_state: number; n_train: number; n_test: number } | null;
+  library_versions: Record<string, string> | null;
+}

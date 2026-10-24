@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     artifact_dir: str = "./artifacts"
     # Proposed default; the real limit is an open decision (docs/PRD.md, NFR-005).
     max_upload_bytes: int = 10 * 1024 * 1024
+    # Worker settings. Both values are proposed defaults.
+    worker_poll_seconds: float = 2.0
+    job_timeout_seconds: int = 3600
     cors_origins: list[str] = ["http://localhost:3000"]
 
 

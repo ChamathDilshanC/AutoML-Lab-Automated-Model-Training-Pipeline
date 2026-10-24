@@ -1,6 +1,6 @@
 # Testing Strategy
 
-> **Status:** CI and a first set of tests exist (`backend/tests/`: health, config, database, ML engine, dataset API, storage, data quality, `automl` import-independence). ML tests build small seeded data in-code instead of reading fixture files. A headless-browser check of the upload flow (light and dark themes, rejection, wrong file type, keyboard focus) was run by hand during M2 and is not part of CI. Everything else below is **Proposed**. Verified commands are in [AGENTS.md § 5](../AGENTS.md#5-commands).
+> **Status:** CI and a first set of tests exist (`backend/tests/`: health, config, database, ML engine, dataset API, experiment API, worker, storage, data quality, `automl` import-independence). ML tests build small seeded data in-code instead of reading fixture files. Headless-browser checks of the upload flow (M2) and of the experiment flow with a separately started worker (M4: queued with no worker, live update to the leaderboard, metric direction, server-side validation errors) were run by hand and are not part of CI. They caught a CORS bug that `TestClient` cannot see, now covered by a preflight test. Everything else below is **Proposed**. Verified commands are in [AGENTS.md § 5](../AGENTS.md#5-commands).
 
 Related: [PRD](PRD.md) · [Architecture § 13](ARCHITECTURE.md#13-test-architecture) · [Deployment § 5](DEPLOYMENT.md#5-cicd-proposed)
 
