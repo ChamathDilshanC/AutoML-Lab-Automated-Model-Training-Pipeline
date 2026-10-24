@@ -41,6 +41,8 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | Feature | Status |
 |---|---|
 | FR-062 `GET /health` | **Implemented (M1)** |
+| FR-001, FR-002, FR-003 | **Implemented (M2)**: multipart upload through the backend to private local storage; validation to `READY`/`REJECTED` |
+| FR-004, FR-005 | **Partly implemented (M2)**: schema, missing values and data-quality warnings; no first-rows preview and no target-leakage warning yet (the target is chosen at experiment time) |
 | FR-020, FR-021, FR-022, FR-024, FR-026, FR-027, FR-030 | **Implemented in the ML engine (M3)**; not yet reachable through the API or UI |
 | FR-023, FR-025 | **Partly implemented (M3)**: hyper-parameters, metrics, split strategy, seed and library versions are recorded; run duration/status are M4 |
 | All other features in this PRD | Proposed |

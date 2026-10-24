@@ -25,7 +25,7 @@ export default function HealthStatus() {
   }, []);
 
   return (
-    <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
+    <p role="status" className="text-sm text-muted">
       {LABELS[state]}
     </p>
   );

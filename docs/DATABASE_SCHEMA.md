@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Status:** **Proposed.** No database or migration exists. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
+> **Status:** **Proposed**, except the `datasets` table, which is implemented (M2, `backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
 
 Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -41,6 +41,8 @@ erDiagram
 | `validation_status` | `PENDING_UPLOAD`, `READY`, `REJECTED` (names Proposed) |
 | `validation_message` | Safe, non-leaky reason |
 | `created_at` | Timestamp |
+
+**Implemented columns (M2):** `dataset_id` (PK, `ds_` + random hex), `owner_id` (indexed; a fixed placeholder `local-user` until authentication in M7), `storage_key`, `original_filename` (sanitised), `size_bytes`, `status` (`UPLOADED`, `READY`, `REJECTED`; `PENDING_UPLOAD` is reserved for the presigned-upload flow), `row_count`, `column_count`, `schema_summary` (JSON list of column summaries), `quality_warnings` (JSON list), `validation_message`, `created_at` (naive UTC). `validation_status` above corresponds to `status`.
 
 ### 3.2 Experiment
 | Field | Notes |

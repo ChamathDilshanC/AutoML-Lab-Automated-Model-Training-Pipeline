@@ -1,6 +1,6 @@
 # API Specification
 
-> **Status:** **Proposed**, except `GET /health`, which is implemented. No other endpoint exists yet. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
+> **Status:** **Proposed**, except `GET /health` and the three dataset routes (§ 4.1), which are implemented (M1, M2). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
 
 Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -39,9 +39,9 @@ Errors never include stack traces, storage keys, credentials or dataset values.
 ## 3. Routes (from the architecture brief)
 | Method | Route | Purpose | PRD |
 |---|---|---|---|
-| `POST` | `/api/v1/datasets` | Register a dataset upload | FR-001, FR-002 |
-| `GET` | `/api/v1/datasets/{dataset_id}` | Get dataset metadata | FR-004 |
-| `POST` | `/api/v1/datasets/{dataset_id}/validate` | Validate uploaded CSV | FR-003 |
+| `POST` | `/api/v1/datasets` | Upload a dataset as multipart form data. **Implemented** | FR-001, FR-002 |
+| `GET` | `/api/v1/datasets/{dataset_id}` | Get dataset metadata and validation report. **Implemented** | FR-004 |
+| `POST` | `/api/v1/datasets/{dataset_id}/validate` | Validate uploaded CSV. **Implemented** | FR-003 |
 | `POST` | `/api/v1/experiments` | Create and queue an experiment | FR-010–FR-012 |
 | `GET` | `/api/v1/experiments/{experiment_id}` | Get status and configuration | FR-014 |
 | `GET` | `/api/v1/experiments/{experiment_id}/results` | Get model comparison results | FR-030, FR-031 |
@@ -63,10 +63,23 @@ These are implied by PRD requirements but not yet agreed.
 
 ## 4. Payload sketches (Proposed — field names may change)
 
-### 4.1 `POST /api/v1/datasets`
-Request: `{ "filename": "housing.csv", "size_bytes": 1048576 }`
-Response `201`: `{ "dataset_id": "...", "status": "PENDING_UPLOAD", "upload": { "method": "PUT", "url": "<short-lived>", "expires_in_seconds": 300 } }`
-Rejects: unsupported extension, declared size above the limit, quota exceeded.
+### 4.1 Dataset routes (**Implemented**, M2)
+In local mode the file goes through the backend. A presigned direct-to-S3 upload (the original `PENDING_UPLOAD` flow) is deferred to the AWS milestone (M6).
+
+**`POST /api/v1/datasets`** — `multipart/form-data` with one `file` field (`.csv` only).
+- `201` with a dataset: `{ dataset_id, original_filename, size_bytes, status: "UPLOADED", created_at, validation: null }`. `created_at` is UTC. Storage keys are never returned.
+- `413 PAYLOAD_TOO_LARGE` above `MAX_UPLOAD_BYTES` (default 10 MiB, **proposed**). A declared `Content-Length` far above the limit is refused up front; otherwise the cap is enforced while the file is written, and the partial file is deleted.
+- `422 VALIDATION_ERROR` for a missing `file` field or a non-`.csv` name. The client filename is sanitised for display and never used as a storage path.
+
+**`POST /api/v1/datasets/{dataset_id}/validate`** — runs the CSV through the engine and returns the report: `{ status: "READY" | "REJECTED", row_count, column_count, columns: [{ name, kind, missing_count, missing_percent, unique_count }], warnings: [{ code, severity, message, columns }], message }`.
+- A rejected file is a normal `200` with `status: "REJECTED"` and a safe `message`; its stored file is removed.
+- Repeating the call on an already-decided dataset returns the stored report.
+- Checks: UTF-8 text, a readable header, no empty/duplicate/ambiguous headers, consistent field counts, row/column limits (`ValidationLimits` defaults, **proposed**).
+- Warning codes: `tiny_dataset`, `constant_column`, `high_missing`, `identifier_like`, `high_cardinality`, `duplicate_rows`.
+
+**`GET /api/v1/datasets/{dataset_id}`** — dataset metadata with `validation` set once the dataset has been validated (`null` while `UPLOADED`).
+
+Dataset statuses: `UPLOADED` (stored, not validated), `READY`, `REJECTED`. Unknown or other owners' datasets return `404 NOT_FOUND`.
 
 ### 4.2 `POST /api/v1/experiments`
 ```json

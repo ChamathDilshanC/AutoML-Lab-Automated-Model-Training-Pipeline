@@ -4,6 +4,8 @@ Error messages may mention column names and counts but never cell values, so the
 show to users (docs/SECURITY.md).
 """
 
+import csv
+import io
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -39,7 +41,9 @@ def validate_headers(columns: Sequence[object]) -> None:
     names = [str(column) for column in columns]
     blank = [position for position, name in enumerate(names) if not name.strip()]
     if blank:
-        raise DataValidationError(f"Column name is empty at position(s): {blank}.")
+        raise DataValidationError(
+            "Column name is empty at position(s): " + ", ".join(str(i + 1) for i in blank) + "."
+        )
 
     seen: dict[str, str] = {}
     duplicates: list[str] = []
@@ -51,7 +55,7 @@ def validate_headers(columns: Sequence[object]) -> None:
             seen[key] = name
     if duplicates:
         raise DataValidationError(
-            f"Duplicate or ambiguous column names: {sorted(set(duplicates))}."
+            "Duplicate or ambiguous column names: " + ", ".join(sorted(set(duplicates))) + "."
         )
 
 
@@ -110,3 +114,36 @@ def validate_target(df: pd.DataFrame, target: str, task: str) -> None:
             raise DataValidationError(
                 f"{too_small} class(es) in target column {target!r} have fewer than 2 rows."
             )
+
+
+def read_csv_bytes(data: bytes, limits: ValidationLimits | None = None) -> pd.DataFrame:
+    """Parse uploaded bytes as UTF-8 CSV and validate the result.
+
+    The raw header row is checked for duplicates before parsing, because the CSV reader would
+    silently rename repeated headers. Messages are fixed text and never echo file content.
+    """
+    limits = limits or ValidationLimits()
+    if not data.strip():
+        raise DataValidationError("File is empty.")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise DataValidationError("File is not valid UTF-8 text.") from None
+    reader = csv.reader(io.StringIO(text))
+    try:
+        header = next(reader)
+    except (StopIteration, csv.Error):
+        raise DataValidationError("File has no readable header row.") from None
+    validate_headers(header)
+    try:
+        for row in reader:
+            if row and len(row) != len(header):  # pandas would otherwise guess an index column
+                raise DataValidationError("Rows do not all have the same number of fields.")
+    except csv.Error:
+        raise DataValidationError("File could not be parsed as CSV.") from None
+    try:
+        df = pd.read_csv(io.StringIO(text), nrows=limits.max_rows + 1)
+    except ValueError:  # includes pandas ParserError and EmptyDataError
+        raise DataValidationError("File could not be parsed as CSV.") from None
+    validate_dataframe(df, limits)
+    return df
