@@ -48,7 +48,8 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: automl
-          POSTGRES_PASSWORD: automl-ci
+          # A throwaway database that exists only for this job and is reachable only from the runner.
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: automl_test
         ports:
           - 5432:5432
@@ -58,7 +59,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql+psycopg://automl:automl-ci@localhost:5432/automl_test
+      TEST_DATABASE_URL: postgresql+psycopg://automl@localhost:5432/automl_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
