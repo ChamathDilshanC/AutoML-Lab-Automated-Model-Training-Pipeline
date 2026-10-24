@@ -17,6 +17,7 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
 | CI | **Implemented (M1):** `.github/workflows/ci.yml` runs backend lint/format/type/test and frontend lint/type/build |
 | Local run | `docker-compose.yml` defined; not yet run |
+| Cloud mode | **Implemented (M6), never run against real AWS:** `STORAGE_MODE=s3`, `JOB_MODE=sqs`, presigned direct uploads, the SQS worker loop, and Terraform for the bucket, queues and IAM policies (`infrastructure/terraform/`). Tested with `moto` and, in a real browser, against a local `moto` server |
 
 Engine functions (all in `backend/automl/`):
 
@@ -126,7 +127,7 @@ Authentication and authorisation; request validation and API versioning; dataset
 Metadata is kept separate from dataset and model files. Local: **SQLite**. Cloud: **Open** — a small DynamoDB table is one candidate, chosen only after checking current pricing, eligibility and operational needs. Entities and relationships: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 
 ### 6.4 Object storage
-Local mode uses a local artifact directory behind the storage adapter. Cloud mode uses private S3 with Block Public Access, encryption at rest, TLS, prefix-scoped permissions and lifecycle rules.
+**Implemented (M6).** `STORAGE_MODE=local` (default) uses a local artifact directory; `STORAGE_MODE=s3` uses one private S3 bucket. Both implement `StorageAdapter` (save, read, size, delete, delete a folder, create an upload target). The S3 bucket has Block Public Access, owner-enforced ownership, SSE-S3 encryption, a TLS-only policy, CORS for the configured origin and cleanup of incomplete multipart uploads; permissions are scoped to the `datasets/` and `models/` prefixes ([ADR 0005](ADR/0005-s3-storage-and-sqs-job-queue.md), `infrastructure/terraform/`). Provider error text never reaches callers.
 
 ```text
 datasets/{owner_id}/{dataset_id}/source.csv
@@ -157,16 +158,17 @@ Algorithm allowlist (Proposed): classification — Logistic Regression, Decision
 | Mode | Mechanism | State |
 |---|---|---|
 | Local | The API writes a `QUEUED` experiment to the database; a separate worker process polls the table and claims jobs with a conditional update, so several workers cannot take the same job | **Implemented (M4)** |
-| Cloud | A durable queue pattern (SQS is a candidate) plus a worker runtime that is not Lambda for long jobs | **Open** |
+| Cloud queue | `JOB_MODE=sqs`: the API also sends the experiment ID to a standard SQS queue (dead-letter queue after 3 deliveries); the worker long-polls it, claims the experiment with the same conditional update, and deletes the message once it is dealt with. The message is only a hint, so duplicates and redeliveries are harmless | **Implemented (M6)** |
+| Cloud worker runtime | Where the API and the worker run in AWS; Lambda is not assumed to fit training | **Open** (M8) |
 | EventBridge | Optional: scheduled experiments, periodic cleanup, supported event routing. Not a job queue or training runtime | Proposed, optional |
 | Lambda | Short orchestration, validation or event handling within its limits. Training does not default to Lambda | Proposed, optional |
 
 ### 6.7 Prediction service
 Loads only registered, approved model artifacts produced by trusted pipeline code. An artifact contains the fitted preprocessing + estimator pipeline, feature names/schema, model version, training configuration and evaluation metrics. Safeguards: validate JSON against the model schema; documented policy for missing/extra/invalid fields; request-size and batch-size limits; model versions immutable; record which version served each prediction; authentication and rate limiting before any public exposure. `joblib`/pickle can execute code on load, so the system must never deserialise untrusted artifacts ([ADR 0002](ADR/0002-trusted-joblib-artifacts.md)).
 
-## 7. End-to-end data flows (Proposed)
+## 7. End-to-end data flows
 
-### 7.1 Dataset upload
+### 7.1 Dataset upload (Implemented, M2 and M6)
 ```mermaid
 sequenceDiagram
     actor U as User
@@ -176,12 +178,13 @@ sequenceDiagram
     participant V as Validation
     U->>FE: Choose CSV
     FE->>API: POST /api/v1/datasets (filename, declared size)
-    API->>API: Authenticate, check name/size/quota
-    API->>ST: Create record, issue short-lived upload target
-    API-->>FE: dataset_id + upload target
-    FE->>ST: Upload file to private key
+    API->>API: Authenticate, check name and size against the limit
+    API->>ST: Create record, ask for an upload target
+    API-->>FE: dataset_id + target (presigned S3 URL, or this API in local mode)
+    FE->>ST: PUT the file (no bearer token for a presigned URL)
     FE->>API: POST /datasets/{id}/validate
-    API->>V: Check real object, CSV structure, schema, limits
+    API->>ST: Check the stored size equals the declared size
+    API->>V: Check CSV structure, schema, limits
     V-->>API: READY or REJECTED
     API-->>FE: Status + data-quality report
 ```
@@ -287,6 +290,7 @@ Details and cost controls: [DEPLOYMENT.md](DEPLOYMENT.md).
 - [ADR 0002 — Trusted joblib artifacts only](ADR/0002-trusted-joblib-artifacts.md)
 - [ADR 0003 — Save the winning model at training time](ADR/0003-save-winning-model-at-training-time.md)
 - [ADR 0004 — Local accounts with bearer tokens](ADR/0004-local-accounts-and-bearer-tokens.md)
+- [ADR 0005 — S3 storage, presigned uploads and an SQS job queue](ADR/0005-s3-storage-and-sqs-job-queue.md)
 
 ## 17. Open questions
 1. Authentication provider and API-credential model for the prediction endpoint.

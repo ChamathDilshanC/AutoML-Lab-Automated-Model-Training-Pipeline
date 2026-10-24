@@ -57,3 +57,23 @@ jobs:
       # No frontend test framework is configured yet.
       - name: Build
         run: npm run build
+
+  # Runs the real Terraform on the runner, because it is not installed on every developer machine.
+  # Nothing here needs AWS credentials and nothing is created: `-backend=false` and `validate`
+  # only read the files and the provider's schema.
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Format check
+        run: terraform fmt -check -diff -recursive
+      - name: Init (no backend, no credentials)
+        run: terraform init -backend=false -input=false
+      - name: Validate
+        run: terraform validate

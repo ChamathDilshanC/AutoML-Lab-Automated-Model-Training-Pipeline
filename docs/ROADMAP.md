@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Status:** M1 is **implemented and merged** (CI passing). M2 to M5 and M7 are **implemented** (see their rows). M7 was done before M6 so the AWS work starts from a secure base. All other milestones are **Proposed** and **Not started**. Milestones follow the order in the owner's architecture brief. Dates are intentionally absent (none supplied).
+> **Status:** M1 is **implemented and merged** (CI passing). M2 to M7 are **implemented** (see their rows). M7 was done before M6 so the AWS work starts from a secure base. M6 has not been run against a real AWS account. All other milestones are **Proposed** and **Not started**. Milestones follow the order in the owner's architecture brief. Dates are intentionally absent (none supplied).
 
 Related: [PRD](PRD.md) · [Architecture](ARCHITECTURE.md) · [Testing](TESTING_STRATEGY.md)
 
@@ -26,7 +26,7 @@ M3 can start in parallel with M2 because the engine is AWS- and web-independent.
 | M3 | ML engine | `automl` package: validation, preprocessing pipeline, splits, trainer, evaluator, metrics | M1 (not M2) | FR-020–FR-027, FR-030 | Deterministic ML tests pass; no leakage tests pass | Implemented (engine only; not yet exposed through the API) |
 | M4 | Experiment management | Experiment API, job states, local worker, run history, leaderboard, reports | M2, M3 | FR-010–FR-014, FR-031–FR-033 | Fixture experiment runs queued → succeeded; leaderboard explains winner | Implemented with a local polling worker. Cancellation and stored run reports are not included |
 | M5 | Model registry | Artifact versioning, metadata, approval, prediction endpoint, prediction test UI | M4 | FR-040–FR-054 | Registered model serves valid prediction; invalid payloads rejected | Implemented with local storage. No revoke, model deletion, authentication or rate limiting yet |
-| M6 | AWS integration | S3 adapter, scoped IAM, optional EventBridge orchestration, CloudWatch logging | M5 | NFR-006, NFR-009 | Same E2E test passes against S3 adapter with no long-lived stray resources | Not started |
+| M6 | AWS integration | S3 adapter, scoped IAM, optional EventBridge orchestration, CloudWatch logging | M5 | NFR-006, NFR-009 | Same E2E test passes against S3 adapter with no long-lived stray resources | Implemented: S3 storage with presigned uploads, an SQS queue with a dead-letter queue, least-privilege IAM and Terraform, all tested against a mock and in a real browser against a local mock server. **Not yet applied to or run against a real AWS account**; EventBridge and CloudWatch are left to M8 |
 | M7 | Security and reliability | Auth, ownership checks everywhere, retention/deletion, retries, rate limits, failure handling | M5 | FR-006, FR-013, FR-060, FR-061, NFR-001–NFR-004 | Security test suite passes; abandoned jobs are reaped | Implemented for local accounts (see [SECURITY § 15](SECURITY.md#15-implemented-so-far-m7) for the gaps: no password reset or MFA, no server-side logout) |
 | M8 | Deployment and documentation | Terraform, CI/CD with OIDC, architecture diagram, screenshots, setup and cost notes | M6, M7 | § 6 MVP | Definition of Done in the PRD demonstrably met | Not started |
 

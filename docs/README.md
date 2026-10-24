@@ -4,7 +4,7 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 
 ## Status legend
 - **Verified / Implemented** — confirmed in code or configuration.
-- **Proposed** — planned design, not built. *Milestones M1 to M5 and M7 are implemented; M6 (AWS) and M8 (deployment) are Proposed.*
+- **Proposed** — planned design, not built. *Milestones M1 to M7 are implemented (M6, the AWS integration, has never been run against a real AWS account); M8 (deployment) is Proposed.*
 - **Assumption** — believed true, unconfirmed.
 - **Open decision** — explicitly unresolved (`TBD` / "Open" in the documents).
 
@@ -35,6 +35,7 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 | [0002](ADR/0002-trusted-joblib-artifacts.md) | Trusted joblib artifacts only | Accepted (implemented in M5) |
 | [0003](ADR/0003-save-winning-model-at-training-time.md) | Save the winning model at training time | Accepted (implemented in M5) |
 | [0004](ADR/0004-local-accounts-and-bearer-tokens.md) | Local accounts with bearer tokens | Accepted for local use (implemented in M7); cloud provider Open |
+| [0005](ADR/0005-s3-storage-and-sqs-job-queue.md) | S3 storage, presigned uploads and an SQS job queue | Accepted (implemented in M6; not run against real AWS) |
 
 ## Requirement traceability
 PRD requirement IDs map to roadmap milestones in [ROADMAP.md](ROADMAP.md), to routes in [API_SPEC.md](API_SPEC.md), to screens in [DESIGN_SYSTEM.md § 8](DESIGN_SYSTEM.md#8-screen-inventory-proposed), and to test layers in [TESTING_STRATEGY.md](TESTING_STRATEGY.md).

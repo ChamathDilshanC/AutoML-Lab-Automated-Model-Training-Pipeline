@@ -33,6 +33,7 @@ out/
 *.tfstate
 *.tfstate.*
 *.tfvars
+tfplan
 
 # OS / editor
 .DS_Store

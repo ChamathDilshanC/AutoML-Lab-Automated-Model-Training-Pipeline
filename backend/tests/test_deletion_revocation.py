@@ -29,6 +29,7 @@ from tests.data import (
     regression_csv,
     regression_payload,
     trained_model_id,
+    upload_dataset,
 )
 
 INSTANCE = {"x1": 1.0, "x2": 0.0, "color": "red"}
@@ -122,12 +123,8 @@ def test_deleting_twice_is_a_404(client: TestClient) -> None:
 def test_deleting_an_unvalidated_or_rejected_dataset_works(
     client: TestClient, tmp_path: Path
 ) -> None:
-    uploaded = client.post(
-        "/api/v1/datasets", files={"file": ("a.csv", classification_csv(), "text/csv")}
-    ).json()["dataset_id"]
-    rejected = client.post("/api/v1/datasets", files={"file": ("b.csv", b"", "text/csv")}).json()[
-        "dataset_id"
-    ]
+    uploaded = upload_dataset(client, classification_csv(), "a.csv")
+    rejected = upload_dataset(client, b"\n", "b.csv")
     client.post(f"/api/v1/datasets/{rejected}/validate")
     for dataset_id in (uploaded, rejected):
         assert client.delete(f"/api/v1/datasets/{dataset_id}").status_code == 204

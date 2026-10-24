@@ -41,7 +41,7 @@ Role model beyond "authenticated owner of their own resources" is **Open**.
 | Feature | Status |
 |---|---|
 | FR-062 `GET /health` | **Implemented (M1)** |
-| FR-001, FR-002, FR-003 | **Implemented (M2)**: multipart upload through the backend to private local storage; validation to `READY`/`REJECTED` |
+| FR-001, FR-002, FR-003 | **Implemented (M2, reworked in M6)**: register the file, send the bytes to a target (this API locally, or a short-lived presigned S3 URL), then validate to `READY`/`REJECTED`. The browser never holds storage credentials. The S3 path has not been run against real AWS |
 | FR-004, FR-005 | **Partly implemented (M2)**: schema, missing values and data-quality warnings; no first-rows preview and no target-leakage warning yet (the target is chosen at experiment time) |
 | FR-020, FR-021, FR-022, FR-024, FR-026, FR-027, FR-030 | **Implemented** in the ML engine (M3) and run by the worker since M4 |
 | FR-023, FR-025 | **Implemented (M3, M4)**: per-run hyper-parameters, metrics, duration and status, plus split strategy, seed and library versions, are recorded |

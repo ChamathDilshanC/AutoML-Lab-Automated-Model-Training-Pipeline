@@ -45,9 +45,17 @@ def rare_class_csv() -> bytes:
 
 
 def upload_dataset(client: TestClient, content: bytes, filename: str = "data.csv") -> str:
-    response = client.post("/api/v1/datasets", files={"file": (filename, content, "text/csv")})
-    assert response.status_code == 201, response.text
-    return str(response.json()["dataset_id"])
+    """Register a dataset and upload its bytes (local mode), without validating it."""
+    registered = client.post(
+        "/api/v1/datasets", json={"filename": filename, "size_bytes": len(content)}
+    )
+    assert registered.status_code == 201, registered.text
+    body = registered.json()
+    target = body["upload"]
+    assert target["requires_auth"] is True  # local mode: the bytes go to this API
+    sent = client.put(target["url"], content=content, headers=target["headers"])
+    assert sent.status_code == 204, sent.text
+    return str(body["dataset_id"])
 
 
 def ready_dataset(client: TestClient, content: bytes, filename: str = "data.csv") -> str:

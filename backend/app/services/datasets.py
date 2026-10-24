@@ -23,11 +23,13 @@ from app.schemas.datasets import (
     ColumnSummary,
     DatasetResponse,
     DatasetStatus,
+    DatasetUploadResponse,
     QualityWarning,
+    UploadTargetResponse,
     ValidationReport,
 )
 from app.services.models import evict_models
-from app.services.storage import FileTooLargeError, StorageAdapter
+from app.services.storage import FileTooLargeError, StorageAdapter, UploadTarget
 from automl.quality import quality_warnings, summarize_schema
 from automl.validation import DataValidationError, ValidationLimits, read_csv_bytes
 
@@ -48,46 +50,67 @@ def storage_key(owner_id: str, dataset_id: str) -> str:
     return f"datasets/{owner_id}/{dataset_id}/source.csv"
 
 
-def create_from_upload(
+CSV_CONTENT_TYPE = "text/csv"
+# `UPLOADED` rows were created before M6 with their file already stored.
+AWAITING_VALIDATION = (DatasetStatus.PENDING_UPLOAD, DatasetStatus.UPLOADED)
+
+
+def register_dataset(
     session: Session,
     storage: StorageAdapter,
     owner_id: str,
-    filename: str | None,
-    stream: BinaryIO,
+    filename: str,
+    size_bytes: int,
     max_bytes: int,
-) -> Dataset:
-    """Store an uploaded file and register it as `UPLOADED`."""
+) -> tuple[Dataset, UploadTarget | None]:
+    """Create the record and the upload target. The file itself arrives separately.
+
+    The declared size is the contract: it is checked against the limit here, signed into a
+    presigned URL (S3 refuses any other length), enforced on the local upload endpoint, and
+    compared with what is really stored when the file is validated.
+    """
     display_name = sanitize_filename(filename)
     if not display_name.lower().endswith(".csv"):
         raise ApiError(
             422,
             "VALIDATION_ERROR",
             "Only .csv files are supported.",
-            [{"field": "file", "issue": "unsupported_file_type"}],
+            [{"field": "filename", "issue": "unsupported_file_type"}],
         )
+    if size_bytes > max_bytes:
+        raise ApiError(413, "PAYLOAD_TOO_LARGE", f"File is larger than the {max_bytes} byte limit.")
 
     dataset_id = f"ds_{uuid.uuid4().hex}"
     key = storage_key(owner_id, dataset_id)
+    target = storage.upload_target(key, size_bytes, CSV_CONTENT_TYPE)
+    dataset = create_dataset(
+        session,
+        dataset_id=dataset_id,
+        owner_id=owner_id,
+        storage_key=key,
+        original_filename=display_name,
+        size_bytes=size_bytes,
+        status=DatasetStatus.PENDING_UPLOAD,
+    )
+    return dataset, target
+
+
+def store_content(storage: StorageAdapter, dataset: Dataset, stream: BinaryIO) -> None:
+    """Save an upload that came through this API (local storage mode)."""
     try:
-        size = storage.save(key, stream, max_bytes)
+        written = storage.save(dataset.storage_key, stream, dataset.size_bytes)
     except FileTooLargeError:
         raise ApiError(
-            413, "PAYLOAD_TOO_LARGE", f"File is larger than the {max_bytes} byte limit."
+            413, "PAYLOAD_TOO_LARGE", "The file is larger than its declared size."
         ) from None
-
-    try:
-        return create_dataset(
-            session,
-            dataset_id=dataset_id,
-            owner_id=owner_id,
-            storage_key=key,
-            original_filename=display_name,
-            size_bytes=size,
-            status=DatasetStatus.UPLOADED,
+    if written != dataset.size_bytes:
+        storage.delete(dataset.storage_key)
+        raise ApiError(
+            422,
+            "VALIDATION_ERROR",
+            "The uploaded size does not match the declared size.",
+            [{"field": "body", "issue": "size_mismatch"}],
         )
-    except Exception:
-        storage.delete(key)
-        raise
 
 
 def validate_dataset(
@@ -95,32 +118,45 @@ def validate_dataset(
     storage: StorageAdapter,
     dataset: Dataset,
     limits: ValidationLimits | None = None,
+    max_bytes: int | None = None,
 ) -> Dataset:
     """Validate the stored file and record `READY` or `REJECTED`.
 
     Validating a dataset that was already decided returns it unchanged. A rejected dataset's
-    file is removed from storage.
+    file is removed from storage. If no file has arrived yet that is a conflict, not a rejection,
+    so the client can upload and try again.
     """
-    if dataset.status != DatasetStatus.UPLOADED:
+    if dataset.status not in AWAITING_VALIDATION:
         return dataset
 
     try:
-        data = storage.read(dataset.storage_key)
+        actual = storage.size(dataset.storage_key)
     except FileNotFoundError:
-        raise ApiError(409, "STATE_CONFLICT", "The uploaded file is no longer available.") from None
+        raise ApiError(
+            409, "STATE_CONFLICT", "No file has been uploaded for this dataset yet."
+        ) from None
+
+    if actual != dataset.size_bytes or (max_bytes is not None and actual > max_bytes):
+        return _reject(
+            session, storage, dataset, "The uploaded file does not match its declared size."
+        )
 
     try:
-        df = read_csv_bytes(data, limits)
+        df = read_csv_bytes(storage.read(dataset.storage_key), limits)
     except DataValidationError as exc:
-        dataset.status = DatasetStatus.REJECTED
-        dataset.validation_message = str(exc)[:500]
-        storage.delete(dataset.storage_key)
-    else:
-        dataset.status = DatasetStatus.READY
-        dataset.row_count = len(df)
-        dataset.column_count = len(df.columns)
-        dataset.schema_summary = [asdict(column) for column in summarize_schema(df)]
-        dataset.quality_warnings = [asdict(warning) for warning in quality_warnings(df)]
+        return _reject(session, storage, dataset, str(exc))
+    dataset.status = DatasetStatus.READY
+    dataset.row_count = len(df)
+    dataset.column_count = len(df.columns)
+    dataset.schema_summary = [asdict(column) for column in summarize_schema(df)]
+    dataset.quality_warnings = [asdict(warning) for warning in quality_warnings(df)]
+    return save_dataset(session, dataset)
+
+
+def _reject(session: Session, storage: StorageAdapter, dataset: Dataset, message: str) -> Dataset:
+    dataset.status = DatasetStatus.REJECTED
+    dataset.validation_message = message[:500]
+    storage.delete(dataset.storage_key)
     return save_dataset(session, dataset)
 
 
@@ -148,7 +184,7 @@ def delete_dataset(session: Session, storage: StorageAdapter, dataset: Dataset) 
 
 
 def to_report(dataset: Dataset) -> ValidationReport | None:
-    if dataset.status == DatasetStatus.UPLOADED:
+    if dataset.status in AWAITING_VALIDATION:
         return None
     return ValidationReport(
         status=DatasetStatus(dataset.status),
@@ -168,4 +204,26 @@ def to_response(dataset: Dataset) -> DatasetResponse:
         status=DatasetStatus(dataset.status),
         created_at=as_utc(dataset.created_at),
         validation=to_report(dataset),
+    )
+
+
+def to_upload_response(dataset: Dataset, target: UploadTarget | None) -> DatasetUploadResponse:
+    """The registered dataset plus where to send its bytes."""
+    if target is None:  # local mode: the file goes to this API
+        target = UploadTarget(
+            method="PUT",
+            url=f"/api/v1/datasets/{dataset.dataset_id}/content",
+            headers={"Content-Type": CSV_CONTENT_TYPE},
+            expires_in_seconds=None,
+            requires_auth=True,
+        )
+    return DatasetUploadResponse(
+        **to_response(dataset).model_dump(),
+        upload=UploadTargetResponse(
+            method=target.method,
+            url=target.url,
+            headers=target.headers,
+            expires_in_seconds=target.expires_in_seconds,
+            requires_auth=target.requires_auth,
+        ),
     )

@@ -3,6 +3,7 @@ import type { ApprovalStatus, DatasetStatus, ExperimentStatus } from "@/lib/type
 type BadgeStatus = DatasetStatus | ExperimentStatus | ApprovalStatus;
 
 const STATUS: Record<BadgeStatus, { label: string; icon: string; color: string }> = {
+  PENDING_UPLOAD: { label: "Waiting for upload", icon: "○", color: "text-warning" },
   UPLOADED: { label: "Uploaded, not validated", icon: "●", color: "text-accent" },
   READY: { label: "Ready", icon: "✓", color: "text-success" },
   REJECTED: { label: "Rejected", icon: "✕", color: "text-danger" },

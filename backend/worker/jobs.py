@@ -19,6 +19,7 @@ from app.db import experiments as repo
 from app.db.models import Dataset, Experiment, ExperimentRun
 from app.schemas.datasets import DatasetStatus
 from app.schemas.experiments import ExperimentStatus, RunStatus
+from app.services.job_queue import QueueMessage, SqsQueue, parse_experiment_id
 from app.services.model_store import register_model
 from app.services.storage import StorageAdapter
 from automl.evaluator import evaluate, rank_results
@@ -193,6 +194,21 @@ def _fail(session: Session, experiment: Experiment, message: str) -> None:
     )
 
 
+def _run_claimed(
+    session: Session, storage: StorageAdapter, experiment: Experiment, max_artifact_bytes: int
+) -> None:
+    """Run an experiment this worker has claimed. Every failure is recorded, none escapes."""
+    logger.info("Claimed experiment %s", experiment.experiment_id)
+    try:
+        run_experiment(session, storage, experiment, max_artifact_bytes=max_artifact_bytes)
+    except JobFailure as failure:
+        _fail(session, experiment, str(failure))
+    except Exception:
+        logger.exception("Experiment %s failed", experiment.experiment_id)
+        _fail(session, experiment, UNEXPECTED_FAILURE)
+    logger.info("Finished experiment %s: %s", experiment.experiment_id, experiment.status)
+
+
 def process_next(
     session_factory: sessionmaker[Session],
     storage: StorageAdapter,
@@ -200,10 +216,10 @@ def process_next(
     job_timeout_seconds: int = 3600,
     max_artifact_bytes: int = DEFAULT_MAX_ARTIFACT_BYTES,
 ) -> bool:
-    """Claim and run one queued experiment. Returns True if a job was processed.
+    """Claim and run one queued experiment from the database (`db` job mode).
 
-    Never raises: any failure is recorded on the experiment (or logged if even that fails) so
-    the worker loop keeps going.
+    Returns True if a job was processed. Never raises: any failure is recorded on the experiment
+    (or logged if even that fails) so the worker loop keeps going.
     """
     try:
         with session_factory() as session:
@@ -211,19 +227,88 @@ def process_next(
             experiment = repo.claim_next_queued(session)
             if experiment is None:
                 return False
-            logger.info("Claimed experiment %s", experiment.experiment_id)
-            try:
-                run_experiment(session, storage, experiment, max_artifact_bytes=max_artifact_bytes)
-            except JobFailure as failure:
-                _fail(session, experiment, str(failure))
-            except Exception:
-                logger.exception("Experiment %s failed", experiment.experiment_id)
-                _fail(session, experiment, UNEXPECTED_FAILURE)
-            logger.info("Finished experiment %s: %s", experiment.experiment_id, experiment.status)
+            _run_claimed(session, storage, experiment, max_artifact_bytes)
             return True
     except Exception:
         logger.exception("Worker iteration failed")
         return False
+
+
+def process_message(
+    session_factory: sessionmaker[Session],
+    storage: StorageAdapter,
+    queue: SqsQueue,
+    message: QueueMessage,
+    *,
+    max_artifact_bytes: int = DEFAULT_MAX_ARTIFACT_BYTES,
+) -> str:
+    """Handle one queue message (`sqs` job mode) and return what happened to it.
+
+    SQS delivers a message at least once and again if it is not deleted in time, so a message is
+    only a hint. Whether to run anything is decided by the conditional claim in the database, which
+    makes duplicates and redeliveries harmless. The message is deleted explicitly, and only once
+    it has been dealt with:
+
+    - `done`: claimed, run, and recorded (success or failure); deleted.
+    - `skipped`: not claimable (already running, finished, reaped or deleted); deleted.
+    - `discarded`: not one of our messages; deleted so it cannot loop forever.
+    - `retry`: the database was unavailable before anything was claimed; NOT deleted, so SQS
+      redelivers it after the visibility timeout (and moves it to the dead-letter queue if it keeps
+      failing).
+    """
+    experiment_id = parse_experiment_id(message.body)
+    if experiment_id is None:
+        logger.warning("Discarding a queue message that is not a job")
+        outcome = "discarded"
+    else:
+        try:
+            with session_factory() as session:
+                experiment = repo.claim_experiment(session, experiment_id)
+                if experiment is None:
+                    logger.info("Experiment %s is not queued; dropping the message", experiment_id)
+                    outcome = "skipped"
+                else:
+                    _run_claimed(session, storage, experiment, max_artifact_bytes)
+                    outcome = "done"
+        except Exception:
+            logger.exception(
+                "Could not handle the message for %s; it will be redelivered", experiment_id
+            )
+            return "retry"
+
+    try:
+        queue.delete(message)
+    except Exception:
+        # Not fatal: the message comes back, fails to claim, and is deleted then.
+        logger.exception("Could not delete a handled queue message")
+    return outcome
+
+
+def run_sqs_loop(
+    session_factory: sessionmaker[Session],
+    storage: StorageAdapter,
+    queue: SqsQueue,
+    *,
+    job_timeout_seconds: int,
+    max_artifact_bytes: int,
+    should_stop: Callable[[], bool],
+    on_error_sleep: Callable[[float], object] = time.sleep,
+) -> None:
+    """Long-poll the queue until `should_stop()` is true. Each receive waits up to the queue's
+    configured wait time, so an idle worker makes about three requests a minute, not a busy loop."""
+    while not should_stop():
+        try:
+            with session_factory() as session:
+                repo.fail_stale_experiments(session, job_timeout_seconds)
+            message = queue.receive()
+        except Exception:
+            logger.exception("Could not receive from the queue; trying again shortly")
+            on_error_sleep(5.0)
+            continue
+        if message is not None:
+            process_message(
+                session_factory, storage, queue, message, max_artifact_bytes=max_artifact_bytes
+            )
 
 
 def run_loop(

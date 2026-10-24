@@ -50,8 +50,18 @@ def session_factory() -> Iterator[sessionmaker[Session]]:
 
 
 @pytest.fixture
+def app_env() -> dict[str, str]:
+    """Extra environment for the app. A test module overrides this fixture to change how the
+    whole app is configured (for example cloud mode) without touching the other fixtures."""
+    return {}
+
+
+@pytest.fixture
 def app(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, session_factory: sessionmaker[Session]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: sessionmaker[Session],
+    app_env: dict[str, str],
 ) -> Iterator[FastAPI]:
     monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path / "storage"))
     monkeypatch.setenv("MAX_UPLOAD_BYTES", str(UPLOAD_LIMIT))
@@ -60,6 +70,8 @@ def app(
     # their own.
     monkeypatch.setenv("PREDICT_RATE_LIMIT_PER_MINUTE", "100000")
     monkeypatch.setenv("LOGIN_RATE_LIMIT_PER_MINUTE", "100000")
+    for name, value in app_env.items():
+        monkeypatch.setenv(name, value)
     get_settings.cache_clear()
     application = create_app()
 

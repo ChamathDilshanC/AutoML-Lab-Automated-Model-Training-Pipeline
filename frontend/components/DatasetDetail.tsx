@@ -86,7 +86,7 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
           </Link>
         </div>
       )}
-      {view.dataset.status === "UPLOADED" && (
+      {(view.dataset.status === "UPLOADED" || view.dataset.status === "PENDING_UPLOAD") && (
         <div>
           <button
             type="button"

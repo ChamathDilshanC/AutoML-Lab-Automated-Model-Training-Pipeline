@@ -92,16 +92,19 @@ def create_experiment(
     dataset: Dataset,
     payload: ExperimentCreate,
     idempotency_key: str | None,
-) -> Experiment:
-    """Queue an experiment. Repeating a request with the same idempotency key returns the first."""
+) -> tuple[Experiment, bool]:
+    """Queue an experiment. Returns it and whether it is new.
+
+    Repeating a request with the same idempotency key returns the first experiment, not new.
+    """
     if idempotency_key:
         existing = repo.find_by_idempotency_key(session, owner_id, idempotency_key)
         if existing is not None:
-            return existing
+            return existing, False
 
     metric, algorithms = validate_config(dataset, payload)
     try:
-        return repo.create_experiment(
+        created = repo.create_experiment(
             session,
             experiment_id=f"ex_{uuid.uuid4().hex}",
             owner_id=owner_id,
@@ -115,12 +118,13 @@ def create_experiment(
             status=ExperimentStatus.QUEUED,
             idempotency_key=idempotency_key,
         )
+        return created, True
     except IntegrityError:
         session.rollback()
         if idempotency_key:
             existing = repo.find_by_idempotency_key(session, owner_id, idempotency_key)
             if existing is not None:
-                return existing
+                return existing, False
         raise
 
 
