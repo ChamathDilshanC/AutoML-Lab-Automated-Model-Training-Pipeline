@@ -4,6 +4,7 @@ The default `client` is signed in as a real user with a real token, so ordinary 
 same authentication path as production. `anonymous_client` has no token.
 """
 
+import os
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +20,7 @@ from app.core.config import get_settings
 from app.core.passwords import hash_password
 from app.core.tokens import create_access_token, resolve_secret_key
 from app.db import users as user_repo
-from app.db.session import Base, get_session
+from app.db.session import Base, get_session, make_engine
 from app.main import create_app
 from app.services.storage import LocalStorage
 
@@ -41,11 +42,20 @@ class TestUser:
 
 @pytest.fixture
 def session_factory() -> Iterator[sessionmaker[Session]]:
-    engine = create_engine(
-        "sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
-    )
+    """In-memory SQLite by default. With TEST_DATABASE_URL set (CI does this) the same tests run
+    against a real PostgreSQL, whose tables are rebuilt for every test."""
+    url = os.environ.get("TEST_DATABASE_URL")
+    if url:
+        engine = make_engine(url)
+        Base.metadata.drop_all(engine)
+    else:
+        engine = create_engine(
+            "sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
+        )
     Base.metadata.create_all(engine)
     yield sessionmaker(bind=engine, expire_on_commit=False)
+    if url:
+        Base.metadata.drop_all(engine)
     engine.dispose()
 
 

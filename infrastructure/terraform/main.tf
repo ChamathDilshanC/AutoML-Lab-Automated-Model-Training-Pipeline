@@ -51,7 +51,7 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
 
   cors_rule {
-    allowed_origins = var.allowed_origins
+    allowed_origins = distinct(concat(var.allowed_origins, var.frontend_origins))
     allowed_methods = ["PUT", "GET", "HEAD"]
     allowed_headers = ["Content-Type"]
     expose_headers  = ["ETag"]

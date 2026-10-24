@@ -68,7 +68,10 @@ def test_the_bucket_refuses_plain_http(main: dict[str, Any]) -> None:
 def test_cors_allows_browser_uploads_only_from_the_configured_origins(main: dict[str, Any]) -> None:
     config = blocks(main, "resource", "aws_s3_bucket_cors_configuration")["artifacts"]
     rule = one(config["cors_rule"])
-    assert rule["allowed_origins"] == "${var.allowed_origins}"  # never a literal "*"
+    # The local origin plus the deployed frontend's origins; never a literal "*".
+    assert (
+        rule["allowed_origins"] == "${distinct(concat(var.allowed_origins, var.frontend_origins))}"
+    )
     assert set(rule["allowed_methods"]) == {"PUT", "GET", "HEAD"}
     assert rule["allowed_headers"] == ["Content-Type"]
     default = variables(load("variables.tf"))["allowed_origins"]["default"]
@@ -152,8 +155,8 @@ def test_the_worker_cannot_touch_datasets_except_to_read_them() -> None:
 def test_nothing_secret_is_created_or_committed() -> None:
     everything = "\n".join(f.read_text(encoding="utf-8") for f in INFRA.glob("*.tf"))
     assert "aws_iam_access_key" not in everything and "aws_iam_user" not in everything
-    for needle in ("AKIA", "aws_secret", "password ="):
-        assert needle not in everything
+    for needle in ("AKIA", "aws_secret", 'password = "'):
+        assert needle not in everything  # no literal key or password anywhere
     assert not list(INFRA.glob("*.tfstate*")) and not list(INFRA.glob("terraform.tfvars"))
 
 

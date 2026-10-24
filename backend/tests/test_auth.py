@@ -274,11 +274,17 @@ def test_token_round_trip_and_expiry() -> None:
 
 def test_the_secret_key_is_required_outside_the_local_environment() -> None:
     with pytest.raises(RuntimeError, match="SECRET_KEY must be set"):
-        tokens.resolve_secret_key(Settings(secret_key=None, environment="production"))
+        tokens.resolve_secret_key(
+            Settings(secret_key=None, environment="production", db_host="db.example")
+        )
     with pytest.raises(RuntimeError, match="at least"):
-        tokens.resolve_secret_key(Settings(secret_key="short", environment="production"))
+        tokens.resolve_secret_key(
+            Settings(secret_key="short", environment="production", db_host="db.example")
+        )
     assert (
-        tokens.resolve_secret_key(Settings(secret_key=TEST_SECRET, environment="production"))
+        tokens.resolve_secret_key(
+            Settings(secret_key=TEST_SECRET, environment="production", db_host="db.example")
+        )
         == TEST_SECRET
     )
 
@@ -295,6 +301,7 @@ def test_the_app_refuses_to_start_in_production_without_a_secret(
 ) -> None:
     monkeypatch.delenv("SECRET_KEY")
     monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("DB_HOST", "db.example")  # SQLite is refused outside local
     get_settings.cache_clear()
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         create_app()
@@ -332,7 +339,8 @@ def test_password_length_rules() -> None:
 @pytest.fixture
 def cli_db(monkeypatch: pytest.MonkeyPatch, session_factory: sessionmaker[Session]) -> None:
     monkeypatch.setattr(cli, "SessionLocal", session_factory)
-    monkeypatch.setattr(cli, "engine", session_factory.kw["bind"])
+    # The fixture already created the tables; do not let the CLI touch the real local database.
+    monkeypatch.setattr(cli, "create_local_tables", lambda: None)
 
 
 def test_cli_creates_a_user_who_can_sign_in(

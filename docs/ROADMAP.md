@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Status:** M1 is **implemented and merged** (CI passing). M2 to M7 are **implemented** (see their rows). M7 was done before M6 so the AWS work starts from a secure base. M6 has not been run against a real AWS account. All other milestones are **Proposed** and **Not started**. Milestones follow the order in the owner's architecture brief. Dates are intentionally absent (none supplied).
+> **Status:** M1 is **implemented and merged** (CI passing). M2 to M8 are **implemented** (see their rows). M7 was done before M6 so the AWS work starts from a secure base. M6 and M8 have not been applied to or run against a real AWS account. Milestones follow the order in the owner's architecture brief. Dates are intentionally absent (none supplied).
 
 Related: [PRD](PRD.md) · [Architecture](ARCHITECTURE.md) · [Testing](TESTING_STRATEGY.md)
 
@@ -28,7 +28,7 @@ M3 can start in parallel with M2 because the engine is AWS- and web-independent.
 | M5 | Model registry | Artifact versioning, metadata, approval, prediction endpoint, prediction test UI | M4 | FR-040–FR-054 | Registered model serves valid prediction; invalid payloads rejected | Implemented with local storage. No revoke, model deletion, authentication or rate limiting yet |
 | M6 | AWS integration | S3 adapter, scoped IAM, optional EventBridge orchestration, CloudWatch logging | M5 | NFR-006, NFR-009 | Same E2E test passes against S3 adapter with no long-lived stray resources | Implemented: S3 storage with presigned uploads, an SQS queue with a dead-letter queue, least-privilege IAM and Terraform, all tested against a mock and in a real browser against a local mock server. **Not yet applied to or run against a real AWS account**; EventBridge and CloudWatch are left to M8 |
 | M7 | Security and reliability | Auth, ownership checks everywhere, retention/deletion, retries, rate limits, failure handling | M5 | FR-006, FR-013, FR-060, FR-061, NFR-001–NFR-004 | Security test suite passes; abandoned jobs are reaped | Implemented for local accounts (see [SECURITY § 15](SECURITY.md#15-implemented-so-far-m7) for the gaps: no password reset or MFA, no server-side logout) |
-| M8 | Deployment and documentation | Terraform, CI/CD with OIDC, architecture diagram, screenshots, setup and cost notes | M6, M7 | § 6 MVP | Definition of Done in the PRD demonstrably met | Not started |
+| M8 | Deployment and documentation | Terraform, CI/CD with OIDC, architecture diagram, screenshots, setup and cost notes | M6, M7 | § 6 MVP | Definition of Done in the PRD demonstrably met | Deployment part implemented as code: production Dockerfile, PostgreSQL with Alembic, Terraform (VPC without NAT, RDS, ECR, App Runner, Fargate worker, OIDC role, budget), `deploy.yml`, ADR 0006 and the deployment guide. Verified: whole suite on PostgreSQL 18, a production-mode run through the entrypoint, `terraform validate`, `actionlint`. **Not applied to AWS; image built only in CI; the architecture diagram image and screenshots are not done** |
 
 ## Recommended first milestone
 **M1 Foundation**, followed immediately by **M3 ML engine**. The engine is the product's core value, is cheap to test, and has no external dependencies, which de-risks the project before any cloud work.

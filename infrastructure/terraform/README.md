@@ -1,5 +1,9 @@
 # AWS infrastructure for AutoML Lab (Terraform)
 
+Two layers, both in this folder: the **cloud-mode resources** (M6: bucket, queue, IAM policies) and the **deployment resources** (M8: network, PostgreSQL, container registry, App Runner API, Fargate worker, GitHub deploy role, budget alert). The deployment layer has its own guide with the apply order, costs and teardown: **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)**. Read it before `terraform apply`; the App Runner and ECS services are created only when `enable_compute = true`, after the first image has been pushed. Nothing here has been applied to a real AWS account.
+
+## Cloud-mode resources (M6)
+
 Creates the AWS resources for **cloud mode** (`STORAGE_MODE=s3`, `JOB_MODE=sqs`; see
 [ADR 0005](../../docs/ADR/0005-s3-storage-and-sqs-job-queue.md)):
 
@@ -9,10 +13,12 @@ Creates the AWS resources for **cloud mode** (`STORAGE_MODE=s3`, `JOB_MODE=sqs`;
 | SQS standard queue + dead-letter queue | Hands experiments to the worker. Long polling, encryption, redrive to the dead-letter queue after 3 deliveries |
 | Three IAM **policies** | `api`, `worker` and `local-dev` (both together). Policies only: **no IAM user and no access key is created**, because keys in Terraform state are secrets |
 
+| *(M8)* VPC, RDS, ECR, App Runner, ECS, OIDC role, budget | See [docs/DEPLOYMENT.md § 3](../../docs/DEPLOYMENT.md) for the file-by-file list |
+
 Nothing here is created by running the application or its tests. Local mode (the default) needs no
 AWS account at all.
 
-> **Cost.** These resources are billed per use and may or may not be covered by your account's free
+> **Cost.** The M8 resources (database, App Runner, the SQS endpoint, a running worker) are billed by the hour and are likely to exceed 10 USD a month if left on; the worker is off by default. See [DEPLOYMENT.md](../../docs/DEPLOYMENT.md#cost-and-how-to-stop-it). These resources are billed per use and may or may not be covered by your account's free
 > tier or free plan. Check the current AWS pricing and your account's terms first, set an AWS
 > Budget alert, and destroy the stack when you are done. Alerts are not a spending cap.
 
@@ -25,13 +31,14 @@ AWS account at all.
 ## Create
 ```bash
 cd infrastructure/terraform
-cp terraform.tfvars.example terraform.tfvars   # optional: change region or allowed origins
+cp terraform.tfvars.example terraform.tfvars   # set github_repository and budget_alert_email (required)
 terraform init
 terraform plan -out=tfplan     # read it: it should only add resources
 terraform apply tfplan
 ```
-Commit the `.terraform.lock.hcl` file that `init` creates, so everyone uses the same provider
-version. Do not commit `terraform.tfvars`, `tfplan` or any `*.tfstate` file (already git-ignored).
+`init` creates `.terraform.lock.hcl`, which pins provider versions; it is not committed yet (CI resolves the newest allowed versions). Do not commit `terraform.tfvars`, `tfplan` or any `*.tfstate` file (already git-ignored).
+
+**The state holds secrets.** Terraform generates the database password and the token-signing key, so both are in the state file. Keep state in an encrypted, access-controlled remote backend (for example a private, versioned, encrypted S3 bucket) rather than on a shared disk; this repository does not configure a backend.
 
 The bucket name defaults to `automl-lab-<account id>-<region>`. Set `bucket_name` to choose your
 own (3 to 63 lower-case letters, digits and hyphens).
@@ -71,7 +78,9 @@ or credentials you created by hand.
 
 ## Checks
 `terraform fmt -check`, `terraform init -backend=false` and `terraform validate` run in CI
-(`.github/workflows/ci.yml`). `backend/tests/test_terraform.py` also checks the security-relevant
-settings (public access blocked, encryption, no wildcard permissions) and
+(`.github/workflows/ci.yml`). `backend/tests/test_terraform.py` and `test_terraform_deployment.py`
+check the security-relevant settings (public access blocked, encryption, private database,
+database reachable only from the API and the worker, no NAT, exact OIDC trust, deploy role
+scope, budget, compute off by default, no wildcard permissions) and
 `backend/tests/test_aws.py` checks that the IAM policies match the calls the code actually makes.
-Neither creates any AWS resource.
+None creates any AWS resource.

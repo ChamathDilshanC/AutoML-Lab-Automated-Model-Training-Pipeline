@@ -1,14 +1,14 @@
 # Database Schema
 
-> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4), `models` (M5), and `users` and `audit_events` (M7) tables, which are implemented (`backend/app/db/models.py`). There is no migration tool yet: tables are created on application start-up with `create_all` as an interim step. The entities and core fields come from the architecture brief; column types, indexes and constraints below are design proposals. When migrations are added, they become the source of truth.
+> **Status:** **Proposed**, except the `datasets` (M2), `experiments` and `experiment_runs` (M4), `models` (M5), and `users` and `audit_events` (M7) tables, which are implemented (`backend/app/db/models.py`). Schema changes are made with **Alembic migrations** (`backend/migrations/versions/`, from M8), which are the source of truth outside local development; `ENVIRONMENT=local` still creates tables directly from the models, and a test checks the two agree. The entities and core fields come from the architecture brief; the column types, indexes and constraints are in `backend/app/db/models.py` and the first migration.
 
 Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.md) · [Security](SECURITY.md)
 
 ## 1. Storage choice
 | Environment | Store | State |
 |---|---|---|
-| Local development | SQLite | Proposed |
-| AWS | Managed store — small DynamoDB table is one candidate | **Open**; decide after checking pricing, eligibility and operational needs |
+| Local development and the default test run | SQLite | Implemented |
+| Anything but `ENVIRONMENT=local` (AWS) | PostgreSQL on RDS (`db.t4g.micro`), through SQLAlchemy and psycopg 3; SQLite is refused | Implemented in M8; never run on RDS. The whole test suite has been run against a local PostgreSQL 18 |
 
 Metadata is stored separately from dataset and model files, which live in object storage ([ARCHITECTURE § 6.4](ARCHITECTURE.md#64-object-storage)).
 
@@ -101,7 +101,7 @@ erDiagram
 - Foreign keys enforced in SQLite (`PRAGMA foreign_keys=ON`).
 
 ## 5. Migrations
-Tool **TBD** (e.g. Alembic for SQLAlchemy). Migrations are forward-only, reviewed in PRs, and tested against a clean database in CI.
+Alembic, run by `python -m app.migrate` (the API container does this on start, under a PostgreSQL advisory lock so concurrent starts are safe; the worker waits for the head revision). Migrations are forward-only in practice, reviewed in PRs, and tested against a clean PostgreSQL in CI: upgrade, downgrade, idempotence, concurrent runs, and that the result matches the models exactly. Current head: `0001` (the full schema).
 
 ## 6. Retention
 Deleting a dataset removes its source object and derived artifacts, subject to documented retention rules (**TBD**); audit events keep IDs only. Temporary uploads that never reach `READY` are expired by lifecycle rules.

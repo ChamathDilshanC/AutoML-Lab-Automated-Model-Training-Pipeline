@@ -1,3 +1,14 @@
 # Copy to terraform.tfvars (which is git-ignored) and adjust. Every value is optional.
 region          = "eu-west-1"
 allowed_origins = ["http://localhost:3000"]
+
+# Required.
+github_repository  = "ChamathDilshanC/AutoML-Lab-Automated-Model-Training-Pipeline"
+budget_alert_email = "you@example.com"
+
+# After the Vercel project exists.
+# frontend_origins = ["https://your-project.vercel.app"]
+
+# Second and third apply (README.md, "Apply order").
+# enable_compute       = true
+# worker_desired_count = 1
