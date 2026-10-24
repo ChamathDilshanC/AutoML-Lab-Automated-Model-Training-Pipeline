@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 to M5 and M7 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction, security and reliability).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker, a leaderboard, a model registry with approval and revocation, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite, behind sign-in with per-user ownership, rate limits, dataset deletion and an abandoned-job reaper. Cloud mode (M6: S3 with presigned uploads, an SQS queue, Terraform) is implemented but **has never been run against a real AWS account**; hosting, EventBridge, CloudWatch and deployment (M8) are not implemented, and neither are password reset, MFA or server-side logout (see `docs/SECURITY.md` § 15). Check the tree before assuming anything else exists.
+**Current state: M1 to M8 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction, AWS cloud mode, security and reliability, deployment).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker, a leaderboard, a model registry with approval and revocation, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite, behind sign-in with per-user ownership, rate limits, dataset deletion and an abandoned-job reaper. Cloud mode (M6: S3 with presigned uploads, an SQS queue, Terraform) is implemented but **has never been run against a real AWS account**; the AWS deployment (M8: production Dockerfile, PostgreSQL with Alembic migrations, Terraform for RDS, App Runner, ECS Fargate, ECR, GitHub OIDC and a budget alert, and `.github/workflows/deploy.yml`) is implemented as code but **has never been applied to AWS**; EventBridge and CloudWatch alarms are not implemented, and neither are password reset, MFA or server-side logout (see `docs/SECURITY.md` § 15). Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).
@@ -46,7 +46,10 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 | Create a user (no public sign-up) | `python -m app.cli create-user <name>` | `backend/` |
 | Backend run | `uvicorn app.main:app --reload` | `backend/` |
 | Worker run (second terminal) | `python -m worker.main` (`--once` processes at most one job; with `JOB_MODE=sqs` it long-polls the queue) | `backend/` |
-| Terraform checks (CI only, Terraform is not required locally) | `terraform fmt -check`, `init -backend=false`, `validate` in `infrastructure/terraform/` | CI |
+| Terraform checks (also run in CI; Terraform is not required locally) | `terraform fmt -check`, `init -backend=false`, `validate` in `infrastructure/terraform/` | `infrastructure/terraform/` |
+| Backend tests on PostgreSQL (needs a database you control; the tests drop and create its tables) | `TEST_DATABASE_URL=postgresql+psycopg://user:pass@host/db pytest` | `backend/` |
+| Apply database migrations (outside `local`; the API container does this itself) | `python -m app.migrate` | `backend/` |
+| Build the production image (roles `api`, `worker`, `migrate`, `cli`) | `docker build -t automl-backend backend` (built in CI; not yet built on the maintainer's machine) | repository root |
 | Frontend install | `npm ci` | `frontend/` |
 | Frontend lint | `npm run lint` | `frontend/` |
 | Frontend type-check | `npm run typecheck` | `frontend/` |
@@ -77,6 +80,7 @@ These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses 
 
 ## 8. Dependencies and API changes
 - Add dependencies only with a stated reason; pin via lockfiles; run dependency scans once CI exists.
+- Schema changes need a new Alembic migration in `backend/migrations/versions/` (a test fails if the models and the migrations differ). Production never creates tables from the models.
 - Do not change public API routes or response shapes without updating [docs/API_SPEC.md](docs/API_SPEC.md) and versioning appropriately.
 
 ## 9. Prohibited actions

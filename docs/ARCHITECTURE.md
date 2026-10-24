@@ -75,7 +75,7 @@ flowchart TD
     WORKER --> LOG
 ```
 
-The diagram shows logical components. Placement of the FastAPI service and the worker in AWS is **Open** and must be decided after measuring memory, duration, package size and cost (see [DEPLOYMENT.md](DEPLOYMENT.md)).
+The diagram shows logical components. In AWS (M8) the API runs on App Runner and the worker on ECS Fargate, both from one Docker image, with RDS PostgreSQL for metadata ([ADR 0006](ADR/0006-aws-deployment.md), [DEPLOYMENT.md](DEPLOYMENT.md)). The memory, duration and cost figures behind that choice have not been measured on real AWS.
 
 ## 4. Core architectural principle
 
@@ -124,7 +124,7 @@ Dataset upload with progress; dataset preview, schema and data-quality summary; 
 Authentication and authorisation; request validation and API versioning; dataset/experiment/model metadata; upload-limit enforcement; presigned URLs; job creation and tracking; experiment results; prediction serving for approved models; audit events and structured logs. Routes: [API_SPEC.md](API_SPEC.md).
 
 ### 6.3 Metadata store
-Metadata is kept separate from dataset and model files. Local: **SQLite**. Cloud: **Open** — a small DynamoDB table is one candidate, chosen only after checking current pricing, eligibility and operational needs. Entities and relationships: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
+Metadata is kept separate from dataset and model files. Local: **SQLite**. Cloud and any `ENVIRONMENT` other than `local`: **PostgreSQL** (RDS), with Alembic migrations; SQLite is refused there ([ADR 0006](ADR/0006-aws-deployment.md)). Entities and relationships: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 
 ### 6.4 Object storage
 **Implemented (M6).** `STORAGE_MODE=local` (default) uses a local artifact directory; `STORAGE_MODE=s3` uses one private S3 bucket. Both implement `StorageAdapter` (save, read, size, delete, delete a folder, create an upload target). The S3 bucket has Block Public Access, owner-enforced ownership, SSE-S3 encryption, a TLS-only policy, CORS for the configured origin and cleanup of incomplete multipart uploads; permissions are scoped to the `datasets/` and `models/` prefixes ([ADR 0005](ADR/0005-s3-storage-and-sqs-job-queue.md), `infrastructure/terraform/`). Provider error text never reaches callers.
@@ -159,7 +159,7 @@ Algorithm allowlist (Proposed): classification — Logistic Regression, Decision
 |---|---|---|
 | Local | The API writes a `QUEUED` experiment to the database; a separate worker process polls the table and claims jobs with a conditional update, so several workers cannot take the same job | **Implemented (M4)** |
 | Cloud queue | `JOB_MODE=sqs`: the API also sends the experiment ID to a standard SQS queue (dead-letter queue after 3 deliveries); the worker long-polls it, claims the experiment with the same conditional update, and deletes the message once it is dealt with. The message is only a hint, so duplicates and redeliveries are harmless | **Implemented (M6)** |
-| Cloud worker runtime | Where the API and the worker run in AWS; Lambda is not assumed to fit training | **Open** (M8) |
+| Cloud worker runtime | The API on App Runner and the worker on ECS Fargate | **Decided** in M8 ([ADR 0006](ADR/0006-aws-deployment.md)); never applied |
 | EventBridge | Optional: scheduled experiments, periodic cleanup, supported event routing. Not a job queue or training runtime | Proposed, optional |
 | Lambda | Short orchestration, validation or event handling within its limits. Training does not default to Lambda | Proposed, optional |
 
@@ -271,7 +271,7 @@ Unit, integration, ML, API, security, end-to-end and cost tests, with determinis
 | Option | Description | State |
 |---|---|---|
 | A — Local-first | Next.js, FastAPI, SQLite, local worker, local artifact directory, Docker Compose | Proposed, **recommended starting point** |
-| B — Hybrid AWS | Separately hosted frontend, FastAPI on a chosen compute service, private S3, separate worker runtime, optional EventBridge, CloudWatch | Proposed; runtime **Open** |
+| B — Hybrid AWS | Frontend on Vercel, API on App Runner, worker on ECS Fargate, RDS PostgreSQL, private S3, SQS; optional EventBridge and CloudWatch alarms are not built | Implemented as code in M8; **never applied** |
 
 Details and cost controls: [DEPLOYMENT.md](DEPLOYMENT.md).
 
