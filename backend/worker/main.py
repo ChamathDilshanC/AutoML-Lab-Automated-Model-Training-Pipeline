@@ -36,7 +36,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     poll_seconds = args.poll_seconds or settings.worker_poll_seconds
 
     if args.once:
-        process_next(SessionLocal, storage, job_timeout_seconds=settings.job_timeout_seconds)
+        process_next(
+            SessionLocal,
+            storage,
+            job_timeout_seconds=settings.job_timeout_seconds,
+            max_artifact_bytes=settings.max_artifact_bytes,
+        )
         return 0
 
     stop = threading.Event()
@@ -49,6 +54,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         storage,
         poll_seconds=poll_seconds,
         job_timeout_seconds=settings.job_timeout_seconds,
+        max_artifact_bytes=settings.max_artifact_bytes,
         should_stop=stop.is_set,
         sleep=stop.wait,
     )

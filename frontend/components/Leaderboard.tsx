@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { algorithmLabel, directionText, formatNumber, metricLabel } from "@/lib/format";
 import type { ExperimentRun, Leaderboard as LeaderboardData } from "@/lib/types";
 
@@ -32,6 +33,14 @@ export default function Leaderboard({ board }: { board: LeaderboardData }) {
           It has the best {metricLabel(board.selection_reason.metric)} (
           {directionText(board.higher_is_better)}) on the held-out test set. Ties are broken by
           algorithm name.
+        </p>
+      )}
+      {board.model_id && (
+        <p>
+          <Link href={`/models/${board.model_id}`} className="font-medium underline">
+            View the registered model
+          </Link>{" "}
+          <span className="text-muted">(it must be approved before it can make predictions)</span>
         </p>
       )}
       {!winner && (

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ApiError
 from app.core.security import get_owner_id
 from app.db import experiments as repo
+from app.db import registry as model_repo
 from app.db.datasets import get_dataset
 from app.db.models import Experiment
 from app.db.session import get_session
@@ -71,4 +72,5 @@ def read_results(
     if experiment.status not in TERMINAL_STATUSES:
         raise ApiError(409, "STATE_CONFLICT", "The experiment has not finished yet.")
     runs = repo.list_runs(session, experiment.experiment_id)
-    return experiment_service.build_leaderboard(experiment, runs)
+    model = model_repo.get_model_for_experiment(session, experiment.experiment_id)
+    return experiment_service.build_leaderboard(experiment, runs, model.model_id if model else None)

@@ -5,7 +5,7 @@ Instructions for any AI or automated coding agent working in this repository. Th
 ## 1. Repository purpose
 **AutoML Lab** is a platform where a user uploads a tabular CSV, picks a target and ML task, and runs a reproducible training pipeline over allowlisted scikit-learn models, then compares results and serves predictions from a versioned model registry.
 
-**Current state: M1 to M4 (foundation, dataset workflow, ML engine, experiment management).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker and a leaderboard work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). The model registry and prediction are **not implemented**. Check the tree before assuming anything else exists.
+**Current state: M1 to M5 (foundation, dataset workflow, ML engine, experiment management, model registry and prediction).** The repository has documentation, a Next.js shell (`frontend/`), a FastAPI service with `GET /health` and SQLite session setup (`backend/app/`), the `automl` ML engine (validation, preprocessing, splits, trainer, evaluator; M3), a worker stub, a few tests, `docker-compose.yml` and a CI workflow. CSV upload, validation, experiment queueing, a separate training worker a leaderboard, a model registry with approval, and a prediction endpoint for approved models work end to end with local storage (`ARTIFACT_DIR`) and SQLite; the owner is a placeholder until authentication (M7). Authentication, rate limiting, deletion and retention, and cloud deployment are **not implemented**. Check the tree before assuming anything else exists.
 
 ## 2. Source-of-truth order
 1. Code, configuration and tests in the repository (once they exist).
@@ -31,7 +31,7 @@ If code and docs disagree, trust the code, then fix the docs in the same change.
 - **TypeScript / Next.js (frontend):** strict TypeScript; components consume design tokens; no direct S3 access with permanent credentials.
 - **ML rules (non-negotiable):** the target is never a feature; fit imputers/encoders/scalers/feature selection on training data only; keep the test set out of hyper-parameter selection; record seed, split strategy, metric definition and library versions; metric direction must be explicit.
 - **Algorithms:** use only the allowlist in [docs/ARCHITECTURE.md § 6.5](docs/ARCHITECTURE.md#65-training-worker). Never import code or class names from dataset content or user configuration.
-- **Artifacts:** `joblib` files are loaded only if produced by this system ([ADR 0002](docs/ADR/0002-trusted-joblib-artifacts.md)).
+- **Artifacts:** `joblib` files are loaded only if produced by this system ([ADR 0002](docs/ADR/0002-trusted-joblib-artifacts.md)). Load them only through `app.services.model_store.load_pipeline`, which verifies the stored SHA-256 first. Never pass request input to joblib or pickle. A registered model is immutable; a change means a new version.
 
 ## 5. Commands
 These were run successfully during M1 (Python 3.13 and Node 24 locally; CI uses Python 3.12 and Node 24). Do not invent others.

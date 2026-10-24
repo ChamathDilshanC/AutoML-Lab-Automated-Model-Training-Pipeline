@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Worker settings. Both values are proposed defaults.
     worker_poll_seconds: float = 2.0
     job_timeout_seconds: int = 3600
+    # Model limits, also proposed defaults.
+    max_prediction_batch: int = 100
+    max_artifact_bytes: int = 200 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:3000"]
 
 

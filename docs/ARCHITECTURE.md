@@ -10,10 +10,10 @@ Related: [PRD](PRD.md) · [API spec](API_SPEC.md) · [Database schema](DATABASE_
 
 | Area | State |
 |---|---|
-| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), `/experiments/new` (configuration form), `/experiments/[id]` (status polling and leaderboard), design tokens in `globals.css` (`frontend/`) |
-| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. **M4 adds:** experiment routes (`/api/v1/experiments`: options, create, read, results), the `experiments` and `experiment_runs` tables and idempotent submission. No model routes yet |
+| Frontend | **Implemented (M1, M2):** Next.js App Router shell with a backend health indicator, `/datasets/new` (upload) and `/datasets/[id]` (validation report), `/experiments/new` (configuration form), `/experiments/[id]` (status polling and leaderboard), `/models` and `/models/[id]` (approval and a prediction form generated from the model's feature schema), design tokens in `globals.css` (`frontend/`) |
+| Backend | **Implemented (M1):** FastAPI app, `GET /health`, request-ID middleware, CORS, settings, SQLite engine/session factory (`backend/app/`). **M2 adds:** dataset upload/validate/read routes under `/api/v1/datasets`, the API error envelope, a body-size middleware, a `StorageAdapter` protocol with a local-disk implementation (under `ARTIFACT_DIR`), the `datasets` table, and an `get_owner_id` dependency that returns a placeholder owner until M7. **M4 adds:** experiment routes (`/api/v1/experiments`: options, create, read, results), the `experiments` and `experiment_runs` tables and idempotent submission. **M5 adds:** model routes (list, read, approve, predict), the `models` table, and checksum-verified artifact loading with a small in-process cache of loaded pipelines |
 | ML engine | **Implemented (M3):** `backend/automl/` provides dataset and target validation, a `ColumnTransformer` preprocessor, stratified/random splits, the algorithm allowlist with train-only grid search, held-out evaluation, and metric-aware ranking. It is not yet wired to the API or worker. `registry.py` is still a stub (M5) |
-| Worker | **Implemented (M4):** `python -m worker.main` is a separate process. It polls the database, atomically claims `QUEUED` experiments one at a time, runs the engine, records each run and the outcome, and fails `RUNNING` jobs that exceed `JOB_TIMEOUT_SECONDS`. Any failure is recorded on the experiment and the loop continues. It imports no web-framework code (tested) |
+| Worker | **Implemented (M4):** `python -m worker.main` is a separate process. It polls the database, atomically claims `QUEUED` experiments one at a time, runs the engine, records each run and the outcome, saves the winning pipeline as a versioned `joblib` artifact with a `metadata.json` before marking the experiment `SUCCEEDED`, and fails `RUNNING` jobs that exceed `JOB_TIMEOUT_SECONDS`. Any failure is recorded on the experiment and the loop continues. It imports no web-framework code (tested) |
 | Infrastructure | `infrastructure/terraform/` exists and is empty |
 | CI | **Implemented (M1):** `.github/workflows/ci.yml` runs backend lint/format/type/test and frontend lint/type/build |
 | Local run | `docker-compose.yml` defined; not yet run |
@@ -28,8 +28,9 @@ Engine functions (all in `backend/automl/`):
 | `trainer.py` | `ESTIMATORS` allowlist, `available_algorithms`, `train_model` returning a `TrainedModel` (pipeline, best parameters, CV score, feature names, library versions) |
 | `evaluator.py` | `METRICS` with direction, `evaluate`, `rank_results`, `scoring_for` |
 | `quality.py` | `summarize_schema`, `quality_warnings` |
+| `registry.py` | `build_feature_schema`, `instances_to_frame` (strict prediction-input validation), `dumps_pipeline` / `loads_pipeline` (trusted bytes only), `sha256_hex`, `build_metadata` |
 
-Experiments record metrics, parameters and the split, but the worker does not persist fitted pipelines yet. How the registry (M5) obtains the winning model, by storing it at training time or by retraining deterministically from the recorded configuration, is **Open**.
+The winning fitted pipeline is saved at training time ([ADR 0003](ADR/0003-save-winning-model-at-training-time.md)). It is fitted on the training split only, so it is exactly the model the leaderboard measured.
 
 Everything else in this document is the target design.
 
@@ -267,6 +268,7 @@ Details and cost controls: [DEPLOYMENT.md](DEPLOYMENT.md).
 ## 16. Architecture decision records
 - [ADR 0001 — Local-first, adapter-based architecture](ADR/0001-local-first-adapter-architecture.md)
 - [ADR 0002 — Trusted joblib artifacts only](ADR/0002-trusted-joblib-artifacts.md)
+- [ADR 0003 — Save the winning model at training time](ADR/0003-save-winning-model-at-training-time.md)
 
 ## 17. Open questions
 1. Authentication provider and API-credential model for the prediction endpoint.

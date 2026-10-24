@@ -1,6 +1,6 @@
 # API Specification
 
-> **Status:** **Proposed**, except `GET /health`, the dataset routes (§ 4.1) and the experiment routes (§ 4.2, § 4.3), which are implemented (M1, M2, M4). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
+> **Status:** **Proposed**, except `GET /health`, the dataset routes (§ 4.1), the experiment routes (§ 4.2, § 4.3) and the model routes (§ 4.4), which are implemented (M1, M2, M4, M5). The error envelope in § 2 is implemented for all routes. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
 
 Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -45,12 +45,12 @@ Errors never include stack traces, storage keys, credentials or dataset values.
 | `POST` | `/api/v1/experiments` | Create and queue an experiment. **Implemented** | FR-010–FR-013 |
 | `GET` | `/api/v1/experiments/{experiment_id}` | Get status and configuration. **Implemented** | FR-014 |
 | `GET` | `/api/v1/experiments/{experiment_id}/results` | Get model comparison results. **Implemented** | FR-030, FR-031 |
-| `GET` | `/api/v1/models` | List registered models | FR-043 |
-| `GET` | `/api/v1/models/{model_id}` | Get model metadata and metrics | FR-043 |
-| `POST` | `/api/v1/models/{model_id}/predict` | Run inference using an approved model | FR-050–FR-053 |
+| `GET` | `/api/v1/models` | List registered models. **Implemented** | FR-043 |
+| `GET` | `/api/v1/models/{model_id}` | Get model metadata and metrics. **Implemented** | FR-043 |
+| `POST` | `/api/v1/models/{model_id}/predict` | Run inference using an approved model. **Implemented** | FR-050–FR-053 |
 | `GET` | `/health` | Liveness/health check. **Implemented**, returns `{"status": "ok"}` | FR-062 |
 
-`GET /api/v1/experiments/options` is an addition to the brief that M4 implemented (§ 4.2).
+`GET /api/v1/experiments/options` (§ 4.2) and `POST /api/v1/models/{model_id}/approve` (§ 4.4) are additions to the brief that were implemented in M4 and M5.
 
 ### 3.1 Candidate additions (not in the brief — **Open**)
 These are implied by PRD requirements but not yet agreed.
@@ -61,7 +61,6 @@ These are implied by PRD requirements but not yet agreed.
 | `DELETE` | `/api/v1/datasets/{dataset_id}` | FR-006 retention/deletion |
 | `GET` | `/api/v1/experiments` | Experiments list/dashboard |
 | `POST` | `/api/v1/experiments/{experiment_id}/cancel` | FR-015 (if cancellation is in scope) |
-| `POST` | `/api/v1/models/{model_id}/approve` | FR-042 (approval workflow) |
 
 ## 4. Payload sketches (Proposed — field names may change)
 
@@ -115,10 +114,21 @@ The API only queues work. A separate worker process trains the models (see [ARCH
 - `split` (strategy, test size, seed, train and test row counts) and `library_versions`.
 - Ranking uses the held-out test score of the chosen metric, in the metric's direction; ties are broken by algorithm name.
 
-### 4.4 `POST /api/v1/models/{model_id}/predict`
-Request: `{ "instances": [ { "<feature>": <value>, ... } ] }`
-Response: `{ "model_id": "...", "model_version": "...", "predictions": [...], "request_id": "..." }`
-Rules: model must be approved (`409` otherwise); fields validated against the model schema; unknown fields rejected by default; batch size and body size limited (values **TBD**).
+### 4.4 Model routes (**Implemented**, M5)
+A model is registered automatically when an experiment succeeds ([ADR 0003](ADR/0003-save-winning-model-at-training-time.md)). `model_id` identifies one immutable artifact; `version` counts the artifacts registered for the same owner, dataset, target column and task (a re-run gives version 2). Storage keys and checksums are never returned.
+
+**`GET /api/v1/models`** lists the caller's models, newest first (not paginated yet). **`GET /api/v1/models/{model_id}`** returns one:
+`{ model_id, version, dataset_id, dataset_filename, experiment_id, run_id, task, target_column, algorithm, metric, metrics, hyperparameters, feature_schema, classes, library_versions, artifact_bytes, approval_status, approved_at, created_at }`.
+`feature_schema` is a list of `{ name, kind, value_type, categories }` where `value_type` is `number`, `string` or `boolean` and `categories` lists the values seen in training for string columns with at most 50 distinct values (otherwise `null`). `metrics` are the winner's held-out test scores.
+
+**`POST /api/v1/models/{model_id}/approve`** with body `{ "confirm": true }` sets `approval_status` to `APPROVED` (it starts as `PENDING`). Any other body is `422`. Approving an approved model changes nothing. There is no revoke route yet.
+
+**`POST /api/v1/models/{model_id}/predict`** with body `{ "instances": [ { "<feature>": <value>, ... } ] }`:
+- `409 STATE_CONFLICT` if the model is not `APPROVED`, or if it was trained with a different scikit-learn version than the one installed.
+- `422 VALIDATION_ERROR` with `details` like `{ "field": "instances[1].x2", "issue": "required field is missing" }`. Each instance must contain exactly the schema's fields: unknown and missing fields are rejected; a number must be a finite JSON number (not a string or boolean); a string field must be a string of at most 200 characters; a boolean field must be `true` or `false`. `null` is accepted for any field and is imputed from training statistics. A category not seen in training is accepted (the encoder ignores it). At most `MAX_PREDICTION_BATCH` instances (default 100, **proposed**). Details never contain submitted values.
+- `200` with `{ model_id, model_version, predictions, classes, probabilities, request_id }`. `probabilities` (one object per instance, keyed by class label) and `classes` are only present for classification.
+- `500 INTERNAL_ERROR` if the artifact is missing or fails its checksum; the message is generic.
+- Input is plain JSON validated field by field. It is never passed to joblib or pickle; only the stored artifact is deserialised, after its SHA-256 matches.
 
 ## 5. Pagination, filtering, versioning
 List endpoints (once defined) use cursor or `limit`/`offset` pagination with a documented maximum page size — style **TBD**. Models are versioned independently of the API version.
