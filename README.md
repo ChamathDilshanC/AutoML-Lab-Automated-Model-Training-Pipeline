@@ -7,7 +7,21 @@ Upload a CSV, choose a target column and task (classification or regression), an
 **Planned stack:** Next.js, Python, FastAPI, scikit-learn, with optional Amazon S3, AWS Lambda, Amazon EventBridge, Amazon CloudWatch and IAM. The project is local-first: AWS is used only where account eligibility and limits allow, and zero cost is not guaranteed.
 
 ## Status
-Planning phase. The repository currently contains documentation only; no application code has been written yet.
+Milestone M1 (Foundation) scaffold is in place: Next.js shell, FastAPI service with `GET /health`, SQLite session setup, CI, and a Docker Compose definition. Datasets, experiments, training, the model registry and predictions are not implemented yet. See the [roadmap](docs/ROADMAP.md).
+
+## Quick start (local)
+```bash
+# Backend (Python 3.11+)
+cd backend
+pip install -e ".[dev]"
+uvicorn app.main:app --reload      # http://localhost:8000/health
+
+# Frontend (Node 20.9+; developed with Node 24)
+cd frontend
+npm ci
+npm run dev                        # http://localhost:3000
+```
+Copy `.env.example` to `.env` only if you need to override defaults; the variable names are listed there. `docker compose up` is also defined but has not been tested yet.
 
 ## Documentation
 Start at the [documentation index](docs/README.md):

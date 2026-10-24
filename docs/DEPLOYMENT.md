@@ -1,6 +1,6 @@
 # Deployment and Cost Control
 
-> **Status:** **Proposed.** Nothing is deployed and no infrastructure code or CI workflow exists. AWS cost **cannot be guaranteed to be $0**; Free Tier / Free Plan eligibility, limits and prices change, so check current terms for the actual account and region before enabling any resource.
+> **Status:** **Proposed.** Nothing is deployed and there is no infrastructure code. A CI workflow (`.github/workflows/ci.yml`) and `docker-compose.yml` exist from M1. AWS cost **cannot be guaranteed to be $0**; Free Tier / Free Plan eligibility, limits and prices change, so check current terms for the actual account and region before enabling any resource.
 
 Related: [Architecture § 14](ARCHITECTURE.md#14-deployment-topology) · [Security](SECURITY.md) · [Testing](TESTING_STRATEGY.md) · [Roadmap](ROADMAP.md)
 
@@ -15,7 +15,7 @@ Related: [Architecture § 14](ARCHITECTURE.md#14-deployment-topology) · [Securi
 - Next.js frontend, FastAPI backend, SQLite metadata, a local Python worker, a local artifact directory (or a development S3 bucket if eligible).
 - Docker Compose for repeatable setup.
 - Validates the entire workflow before any cloud dependency or spend.
-- Run commands: **TBD** until the services are scaffolded (see [AGENTS.md](../AGENTS.md)).
+- Run commands: see [AGENTS.md § 5](../AGENTS.md#5-commands). `docker compose up` is defined in `docker-compose.yml` but has not been run yet.
 
 ## 3. Option B — Hybrid AWS
 - Frontend hosted separately or by an appropriate hosting option.

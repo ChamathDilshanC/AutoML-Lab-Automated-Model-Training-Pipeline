@@ -1,6 +1,6 @@
 # API Specification
 
-> **Status:** **Proposed.** No endpoint exists yet. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
+> **Status:** **Proposed**, except `GET /health`, which is implemented. No other endpoint exists yet. The route table in § 3 comes from the owner's architecture brief; request/response field names, the error envelope and the "candidate additions" are design proposals to be finalised when the backend is scaffolded. Once the FastAPI app exists, its generated OpenAPI document becomes the source of truth and this file should link to it.
 
 Related: [Architecture § 6.2](ARCHITECTURE.md#62-fastapi-backend) · [PRD](PRD.md) · [Security](SECURITY.md)
 
@@ -48,7 +48,7 @@ Errors never include stack traces, storage keys, credentials or dataset values.
 | `GET` | `/api/v1/models` | List registered models | FR-043 |
 | `GET` | `/api/v1/models/{model_id}` | Get model metadata and metrics | FR-043 |
 | `POST` | `/api/v1/models/{model_id}/predict` | Run inference using an approved model | FR-050–FR-053 |
-| `GET` | `/health` | Liveness/health check | FR-062 |
+| `GET` | `/health` | Liveness/health check. **Implemented**, returns `{"status": "ok"}` | FR-062 |
 
 ### 3.1 Candidate additions (not in the brief — **Open**)
 These are implied by PRD requirements but not yet agreed.
