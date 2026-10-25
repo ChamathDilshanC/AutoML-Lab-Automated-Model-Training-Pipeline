@@ -41,7 +41,7 @@ What exists, all in `infrastructure/terraform/`:
 | `cicd.tf` | GitHub OIDC provider and the deploy role |
 | `budget.tf` | AWS Budget with email alerts |
 
-The App Runner service and the ECS service are created only when `enable_compute = true`.
+The App Runner VPC connector, the App Runner service and the ECS service are created only when `enable_compute = true`. With `false`, Terraform makes no App Runner call at all, so the base infrastructure (network, database, bucket, queues, registry, IAM, budget) can be applied on its own. This matters on a new account: until AWS finishes activating it, every App Runner call fails with `SubscriptionRequiredException`. Keep `enable_compute = false` until that clears, then continue with step 3.
 
 ### Apply order (three steps, because the services need an image that does not exist yet)
 You need: an AWS account you control, Terraform 1.6 or newer, the AWS CLI, Docker, and credentials from `aws sso login` or `aws configure` (never keys in files). Read [Cost and how to stop it](#cost-and-how-to-stop-it) first.

@@ -128,7 +128,7 @@ variable "db_skip_final_snapshot" {
 }
 
 variable "enable_compute" {
-  description = "Create the App Runner service and the ECS worker service. Leave false for the first apply: both need an image in ECR, which exists only after the first push (README.md, Apply order)."
+  description = "Create the compute layer: the App Runner VPC connector and service, and the ECS worker service. Leave false for the first apply: the services need an image in ECR, which exists only after the first push (docs/DEPLOYMENT.md, Apply order). Also keep it false while App Runner is not yet activated for a new account (SubscriptionRequiredException); with false, Terraform makes no App Runner call."
   type        = bool
   default     = false
 }
