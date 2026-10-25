@@ -1,6 +1,6 @@
 # AWS infrastructure for AutoML Lab (Terraform)
 
-Two layers, both in this folder: the **cloud-mode resources** (M6: bucket, queue, IAM policies) and the **deployment resources** (M8: network, PostgreSQL, container registry, the API on Lambda, Fargate worker, Amplify frontend, GitHub deploy role, budget alert). The deployment layer has its own guide with the apply order, costs and teardown: **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)**. Read it before `terraform apply`; the Lambda function and the ECS service are created only when `enable_compute = true`, after the first image has been pushed, and the Amplify app only when `enable_frontend = true`. Only the base layer has been applied to an AWS account.
+Two layers, both in this folder: the **cloud-mode resources** (M6: bucket, queue, IAM policies) and the **deployment resources** (M8: network, PostgreSQL, container registry, the API on Lambda, Fargate worker, Amplify frontend, GitHub deploy role, budget alert). The deployment layer has its own guide with the apply order, costs and teardown: **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)**. Read it before `terraform apply`; the Lambda function and the ECS service are created only when `enable_compute = true`, after the first image has been pushed, and the Amplify app only when `enable_frontend = true`. It has been applied to one AWS account and the API is live on Lambda ([DEPLOYMENT.md § Current deployment](../../docs/DEPLOYMENT.md#current-deployment)).
 
 ## Cloud-mode resources (M6)
 

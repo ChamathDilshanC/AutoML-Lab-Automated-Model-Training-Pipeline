@@ -1,6 +1,6 @@
 # ADR 0007 — The API on Lambda and the frontend on Amplify Hosting
 
-- **Status:** Accepted. Supersedes [ADR 0006](0006-aws-deployment.md) § 1 for the API and the frontend, § 5 for how the API gets its secrets, and the App Runner parts of §§ 4, 6, 7 and 9. Implemented as code; **not applied** to AWS.
+- **Status:** Accepted. Supersedes [ADR 0006](0006-aws-deployment.md) § 1 for the API and the frontend, § 5 for how the API gets its secrets, and the App Runner parts of §§ 4, 6, 7 and 9. Implemented and applied: the API has been live on Lambda since 2026-10-26 (deployed by hand). Amplify has not been applied; the frontend runs on Vercel.
 - **Date:** 2026-10-25
 
 ## Context
@@ -49,7 +49,8 @@ Amplify documents server-side rendering for Next.js 12 to 15 and lists streaming
 ## What is verified
 - `terraform fmt` and `terraform validate` pass with the AWS provider 6.70.
 - Static tests of the properties above (no App Runner resource left, every Lambda resource behind `enable_compute` and every Amplify resource behind `enable_frontend`, private subnets and the `api` security group, the URL public but direct invocation not, no reserved `AWS_REGION`, the role trusting only Lambda, the workflow never printing the configuration); the region and invocation checks were confirmed by breaking them on purpose.
+- CI builds the image with the adapter and runs it as an ordinary container (non-root, `/health`).
+- On AWS (2026-10-26): the function runs in the VPC and the adapter starts the image; `GET /health` on the Function URL answers 200, `/api/v1` routes answer 401 without a token, and a CORS preflight from the Vercel origin is allowed. Each new instance applies the migrations before it serves, so an answering instance has also reached RDS with the injected password.
 
 ## What is not verified
-- Anything on AWS: creating the function in the VPC, the adapter starting the image, cold-start time, the Function URL's `X-Forwarded-For`, the deploy workflow, the Amplify connection and build.
-- The image with the adapter has not been built on the author's machine; CI builds it.
+- Cold-start time, the Function URL's `X-Forwarded-For`, the deploy workflow, S3 uploads and SQS hand-off from the API, and the Amplify connection and build.

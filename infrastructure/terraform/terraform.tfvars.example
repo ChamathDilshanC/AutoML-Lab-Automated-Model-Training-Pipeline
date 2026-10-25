@@ -6,8 +6,9 @@ allowed_origins = ["http://localhost:3000"]
 github_repository  = "ChamathDilshanC/AutoML-Lab-Automated-Model-Training-Pipeline"
 budget_alert_email = "you@example.com"
 
-# Only if the frontend also runs on Vercel (the Amplify origin is added automatically).
-# frontend_origins = ["https://your-project.vercel.app"]
+# Origins of a frontend outside Amplify, e.g. the Vercel deployment (the Amplify origin is added
+# automatically). No trailing slash.
+# frontend_origins = ["https://automl-lab-ui.vercel.app"]
 
 # Second and third apply (docs/DEPLOYMENT.md, "Apply order").
 # enable_compute       = true
