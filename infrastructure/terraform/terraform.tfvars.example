@@ -10,9 +10,11 @@ budget_alert_email = "you@example.com"
 # automatically). No trailing slash.
 # frontend_origins = ["https://automl-lab-ui.vercel.app"]
 
-# Second and third apply (docs/DEPLOYMENT.md, "Apply order").
-# enable_compute       = true
-# worker_desired_count = 1
+# Second and third apply (docs/DEPLOYMENT.md, "Apply order"). The worker then starts and stops by
+# itself with the experiments queue (docs/WORKER_AUTOSCALING.md); both settings below are defaults.
+# enable_compute               = true
+# enable_worker_autoscaling    = true
+# worker_scale_in_idle_minutes = 5
 
 # Frontend on Amplify Hosting. The GitHub token never goes in this file: on the apply that creates
 # the app, run `export TF_VAR_amplify_github_token=<token>` first.

@@ -187,13 +187,30 @@ variable "worker_memory" {
 }
 
 variable "worker_desired_count" {
-  description = "How many worker tasks run. 0 means none: experiments stay QUEUED until you set 1."
+  description = "Worker tasks when the service is first created. Terraform ignores it afterwards: with enable_worker_autoscaling the queue decides, otherwise change the count by hand (docs/WORKER_AUTOSCALING.md)."
   type        = number
   default     = 0
 
   validation {
     condition     = var.worker_desired_count >= 0 && var.worker_desired_count <= 1
     error_message = "Use 0 or 1. More than one worker is not needed or tested at this scale."
+  }
+}
+
+variable "enable_worker_autoscaling" {
+  description = "Start the worker (0 -> 1 task) when the experiments queue has work and stop it once the queue has been idle for worker_scale_in_idle_minutes (worker_autoscaling.tf). Needs enable_compute."
+  type        = bool
+  default     = true
+}
+
+variable "worker_scale_in_idle_minutes" {
+  description = "Minutes with no experiment waiting and none in flight before the worker is stopped."
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = var.worker_scale_in_idle_minutes >= 2 && var.worker_scale_in_idle_minutes <= 60 && floor(var.worker_scale_in_idle_minutes) == var.worker_scale_in_idle_minutes
+    error_message = "Use a whole number of minutes from 2 to 60."
   }
 }
 

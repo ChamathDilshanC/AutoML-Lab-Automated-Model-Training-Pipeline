@@ -144,7 +144,7 @@ text(9.0, 9.2, "VPC · automl-lab-vpc · 10.20.0.0/16", size=12, weight="bold", 
 box(8.3, 5.4, 10.9, 3.1, face="#EEF6EC", edge=STORAGE, lw=1.4, dash="--", z=0)
 text(9.1, 8.25, "Public subnets · 10.20.0.0/24 · 10.20.1.0/24", size=10.5, color="#3F6212", weight="bold")
 service(8.55, 5.6, 3.1, 2.2, NETWORK, "S3 gateway endpoint", ["On the public and", "private route tables;", "S3 traffic stays inside", "AWS"])
-service(12.0, 5.6, 4.5, 2.2, COMPUTE, "ECS Fargate · worker", ["Cluster automl-lab-cluster", "Service automl-lab-worker (1 task)", "Runs python -m worker.main", "Public IP, no NAT gateway", "Logs go to CloudWatch Logs"])
+service(12.0, 5.6, 4.5, 2.2, COMPUTE, "ECS Fargate · worker", ["Cluster automl-lab-cluster", "Service automl-lab-worker", "0–1 tasks, started and stopped", "by SQS alarms (autoscaling)", "Public IP, no NAT gateway"])
 
 # Internet gateway sits on the VPC border.
 box(14.7, 9.25, 1.9, 0.6, face=NETWORK, edge=NETWORK, z=6)
@@ -194,7 +194,7 @@ legend = [
     (3, "The browser uploads a CSV straight to S3 with a presigned PUT URL."),
     (4, "The API reaches RDS through its network interfaces (PostgreSQL over TLS)."),
     (5, "The API puts experiment jobs on SQS through the interface endpoint."),
-    (6, "The worker polls SQS, reads and writes S3 via the gateway endpoint, writes RDS."),
+    (6, "Queue has work: the worker starts, polls SQS, uses S3 and RDS; idle 5 min: it stops."),
     (7, "GitHub Actions swaps its OIDC token for the deploy role, pushes to ECR, then rolls out."),
 ]
 for i, (n, s_) in enumerate(legend):
