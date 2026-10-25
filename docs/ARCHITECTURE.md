@@ -159,7 +159,7 @@ Algorithm allowlist (Proposed): classification — Logistic Regression, Decision
 |---|---|---|
 | Local | The API writes a `QUEUED` experiment to the database; a separate worker process polls the table and claims jobs with a conditional update, so several workers cannot take the same job | **Implemented (M4)** |
 | Cloud queue | `JOB_MODE=sqs`: the API also sends the experiment ID to a standard SQS queue (dead-letter queue after 3 deliveries); the worker long-polls it, claims the experiment with the same conditional update, and deletes the message once it is dealt with. The message is only a hint, so duplicates and redeliveries are harmless | **Implemented (M6)** |
-| Cloud worker runtime | The API on Lambda (Function URL) and the worker on ECS Fargate | **Decided** in M8 ([ADR 0006](ADR/0006-aws-deployment.md); API changed by [ADR 0007](ADR/0007-lambda-api-and-amplify-frontend.md)); never applied |
+| Cloud worker runtime | The API on Lambda (Function URL) and the worker on ECS Fargate | **Decided** in M8 ([ADR 0006](ADR/0006-aws-deployment.md); API changed by [ADR 0007](ADR/0007-lambda-api-and-amplify-frontend.md)); API live on Lambda, worker training not yet verified on AWS |
 | EventBridge | Optional: scheduled experiments, periodic cleanup, supported event routing. Not a job queue or training runtime | Proposed, optional |
 | Lambda | Short orchestration, validation or event handling within its limits. Training does not default to Lambda | Proposed, optional |
 
@@ -271,7 +271,7 @@ Unit, integration, ML, API, security, end-to-end and cost tests, with determinis
 | Option | Description | State |
 |---|---|---|
 | A — Local-first | Next.js, FastAPI, SQLite, local worker, local artifact directory, Docker Compose | Proposed, **recommended starting point** |
-| B — Hybrid AWS | Frontend on Amplify Hosting or Vercel, API on Lambda, worker on ECS Fargate, RDS PostgreSQL, private S3, SQS; optional EventBridge and CloudWatch alarms are not built | Implemented as code in M8; base layer applied, compute and frontend **never applied** |
+| B — Hybrid AWS | Frontend on Amplify Hosting or Vercel, API on Lambda, worker on ECS Fargate, RDS PostgreSQL, private S3, SQS; optional EventBridge and CloudWatch alarms are not built | Implemented in M8 and applied: API live on Lambda, frontend on Vercel; worker training and Amplify **not verified** |
 
 Details and cost controls: [DEPLOYMENT.md](DEPLOYMENT.md).
 

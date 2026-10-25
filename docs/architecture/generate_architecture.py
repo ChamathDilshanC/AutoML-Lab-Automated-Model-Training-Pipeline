@@ -107,7 +107,7 @@ ax.text(0.4, H - 0.45, "AutoML Lab — AWS architecture", fontsize=24, fontweigh
 ax.text(
     0.4,
     H - 0.95,
-    "Region us-east-1 · as defined in infrastructure/terraform/ · base layer applied; API, worker and frontend not yet",
+    "Region us-east-1 · as defined in infrastructure/terraform/ · applied; API live on Lambda, frontend on Vercel",
     fontsize=12.5,
     color=MUTED,
     va="center",

@@ -4,7 +4,7 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 
 ## Status legend
 - **Verified / Implemented** — confirmed in code or configuration.
-- **Proposed** — planned design, not built. *Milestones M1 to M8 are implemented; the AWS parts (M6 cloud mode, M8 deployment) have never been applied to or run against a real AWS account.*
+- **Proposed** — planned design, not built. *Milestones M1 to M8 are implemented. The AWS deployment is applied to one account and the API is live on Lambda ([DEPLOYMENT.md § Current deployment](DEPLOYMENT.md#current-deployment)); worker training, S3 uploads and the SQS hand-off have not been exercised on AWS yet.*
 - **Assumption** — believed true, unconfirmed.
 - **Open decision** — explicitly unresolved (`TBD` / "Open" in the documents).
 
@@ -36,8 +36,8 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 | [0003](ADR/0003-save-winning-model-at-training-time.md) | Save the winning model at training time | Accepted (implemented in M5) |
 | [0004](ADR/0004-local-accounts-and-bearer-tokens.md) | Local accounts with bearer tokens | Accepted for local use (implemented in M7); cloud provider Open |
 | [0005](ADR/0005-s3-storage-and-sqs-job-queue.md) | S3 storage, presigned uploads and an SQS job queue | Accepted (implemented in M6; not run against real AWS) |
-| [0006](ADR/0006-aws-deployment.md) | AWS deployment: App Runner, Fargate, RDS PostgreSQL and OIDC | Accepted (implemented in M8; base layer applied, compute not); partly superseded by 0007 |
-| [0007](ADR/0007-lambda-api-and-amplify-frontend.md) | The API on Lambda and the frontend on Amplify Hosting | Accepted (implemented as code; not applied) |
+| [0006](ADR/0006-aws-deployment.md) | AWS deployment: App Runner, Fargate, RDS PostgreSQL and OIDC | Accepted (implemented in M8 and applied); partly superseded by 0007 |
+| [0007](ADR/0007-lambda-api-and-amplify-frontend.md) | The API on Lambda and the frontend on Amplify Hosting | Accepted (API live on Lambda; Amplify not applied) |
 
 ## Requirement traceability
 PRD requirement IDs map to roadmap milestones in [ROADMAP.md](ROADMAP.md), to routes in [API_SPEC.md](API_SPEC.md), to screens in [DESIGN_SYSTEM.md § 8](DESIGN_SYSTEM.md#8-screen-inventory-proposed), and to test layers in [TESTING_STRATEGY.md](TESTING_STRATEGY.md).

@@ -8,7 +8,7 @@ Related: [Architecture § 6.3](ARCHITECTURE.md#63-metadata-store) · [PRD](PRD.m
 | Environment | Store | State |
 |---|---|---|
 | Local development and the default test run | SQLite | Implemented |
-| Anything but `ENVIRONMENT=local` (AWS) | PostgreSQL on RDS (`db.t4g.micro`), through SQLAlchemy and psycopg 3; SQLite is refused | Implemented in M8; never run on RDS. The whole test suite has been run against a local PostgreSQL 18 |
+| Anything but `ENVIRONMENT=local` (AWS) | PostgreSQL on RDS (`db.t4g.micro`), through SQLAlchemy and psycopg 3; SQLite is refused | Implemented in M8; the live API on Lambda runs against RDS (each new instance applies the migrations before serving). The whole test suite has been run against a local PostgreSQL 18 |
 
 Metadata is stored separately from dataset and model files, which live in object storage ([ARCHITECTURE § 6.4](ARCHITECTURE.md#64-object-storage)).
 

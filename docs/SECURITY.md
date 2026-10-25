@@ -144,7 +144,7 @@ Defined in Terraform and GitHub Actions; **none of it has been applied or run on
 - **ECS Exec is off by default** (`enable_ecs_exec`); enabling it adds a shell path into the worker task and its permissions.
 
 **Not verified or not done**
-- Everything that requires AWS: the OIDC trust, the Lambda function in the VPC and its Function URL permissions, the worker's secret resolution, the endpoints, the budget emails, the Amplify connection. The `X-Forwarded-For` behaviour of the Function URL is an assumption.
+- On AWS, only the API has been checked (2026-10-26): it answers through its public Function URL, refuses `/api/v1` without a token, and allows CORS only for the configured origin. Not verified: the OIDC trust and deploy workflow, the worker's secret resolution, the budget emails, the Amplify connection. The `X-Forwarded-For` behaviour of the Function URL is an assumption.
 - The Docker image was built only in CI, not on the author's machine.
 - The database user is the instance's master user (no separate least-privilege application user); the API and the worker share it.
 - No WAF, no CloudWatch alarms, no CloudTrail configuration, no automated rotation of the database password or signing key (replace with `terraform apply -replace=...` and redeploy; replacing the signing key signs everyone out).
