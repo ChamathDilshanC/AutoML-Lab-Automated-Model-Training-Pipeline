@@ -64,10 +64,31 @@ def test_it_builds_pushes_both_tags_then_deploys_api_and_worker(
     assert '"$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"' in runs
     assert '"$REGISTRY/$ECR_REPOSITORY:latest"' in runs
     assert runs.index("docker build") < runs.index("docker push")
-    assert runs.index("docker push") < runs.index("aws apprunner start-deployment")
-    assert runs.index("aws apprunner start-deployment") < runs.index("aws ecs update-service")
+    assert runs.index("docker push") < runs.index("aws lambda update-function-code")
+    assert runs.index("aws lambda update-function-code") < runs.index("aws ecs update-service")
     assert "--force-new-deployment" in runs
     assert "/health" in runs  # a smoke test closes the job
+    assert "apprunner" not in runs
+
+
+def test_the_api_is_deployed_as_a_single_manifest_image_by_commit(
+    steps: list[dict[str, Any]],
+) -> None:
+    runs = "\n".join(s.get("run", "") for s in steps)
+    assert "--provenance=false" in runs  # Lambda rejects a multi-manifest index
+    assert '--image-uri "$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"' in runs
+
+
+def test_the_functions_secrets_never_reach_the_log(steps: list[dict[str, Any]]) -> None:
+    # update-function-code and get-function-configuration return the environment variables,
+    # two of which are secrets, so their output must always be narrowed.
+    checked = 0
+    for step in steps:
+        for line in step.get("run", "").replace("\\\n", " ").splitlines():
+            if "aws lambda update-function-code" in line or "get-function-configuration" in line:
+                assert "--query" in line, step.get("name")
+                checked += 1
+    assert checked >= 2  # the update and the failure diagnosis
 
 
 def test_the_image_is_smoke_tested_before_it_is_pushed(steps: list[dict[str, Any]]) -> None:

@@ -1,6 +1,6 @@
 name: Deploy
 
-# Builds the backend image, pushes it to ECR and rolls out the API (App Runner) and the worker
+# Builds the backend image, pushes it to ECR and rolls out the API (Lambda) and the worker
 # (ECS Fargate) whenever main changes. AWS is reached with a short-lived OIDC token: there are no
 # AWS keys in this repository or in GitHub secrets (docs/ADR/0006, docs/DEPLOYMENT.md).
 #
@@ -32,7 +32,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-      APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
+      API_FUNCTION_NAME: ${{ vars.API_FUNCTION_NAME }}
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
       ECS_WORKER_SERVICE: ${{ vars.ECS_WORKER_SERVICE }}
     steps:
@@ -41,7 +41,7 @@ jobs:
           AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
         run: |
           missing=""
-          for name in AWS_REGION AWS_DEPLOY_ROLE_ARN ECR_REPOSITORY APP_RUNNER_SERVICE_ARN ECS_CLUSTER ECS_WORKER_SERVICE; do
+          for name in AWS_REGION AWS_DEPLOY_ROLE_ARN ECR_REPOSITORY API_FUNCTION_NAME ECS_CLUSTER ECS_WORKER_SERVICE; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -62,11 +62,14 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Lambda accepts only a single-platform image manifest, so no provenance attestation, which
+      # would turn the push into a multi-manifest index.
       - name: Build image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           docker build \
+            --provenance=false \
             --tag "$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" \
             --tag "$REGISTRY/$ECR_REPOSITORY:latest" \
             backend
@@ -86,35 +89,28 @@ jobs:
           docker push "$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
           docker push "$REGISTRY/$ECR_REPOSITORY:latest"
 
-      # The API container applies database migrations itself when it starts, so there is no
-      # separate migration step to forget.
-      - name: Deploy API (App Runner)
-        id: api
+      # The API applies database migrations itself when a Lambda instance starts, so there is no
+      # separate migration step to forget; the smoke test below starts the first one.
+      # Every call that returns the function's configuration is limited with --query: the
+      # configuration includes its environment variables, and two of them hold secret values.
+      - name: Deploy API (Lambda)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          operation=$(aws apprunner start-deployment \
-            --service-arn "$APP_RUNNER_SERVICE_ARN" \
-            --query OperationId --output text)
-          echo "operation=$operation" >> "$GITHUB_OUTPUT"
+          aws lambda update-function-code \
+            --function-name "$API_FUNCTION_NAME" \
+            --image-uri "$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" \
+            --query LastUpdateStatus --output text
 
       - name: Wait for the API deployment
-        env:
-          OPERATION: ${{ steps.api.outputs.operation }}
         run: |
-          for attempt in $(seq 1 60); do
-            status=$(aws apprunner list-operations \
-              --service-arn "$APP_RUNNER_SERVICE_ARN" \
-              --query "OperationSummaryList[?Id=='$OPERATION'].Status | [0]" --output text)
-            echo "attempt $attempt: $status"
-            case "$status" in
-              SUCCEEDED) exit 0 ;;
-              FAILED | ROLLBACK_SUCCEEDED | ROLLBACK_FAILED)
-                echo "::error::App Runner deployment ended as $status. See the service's logs in the console."
-                exit 1 ;;
-            esac
-            sleep 15
-          done
-          echo "::error::Timed out waiting for the App Runner deployment."
-          exit 1
+          if ! aws lambda wait function-updated --function-name "$API_FUNCTION_NAME"; then
+            reason=$(aws lambda get-function-configuration \
+              --function-name "$API_FUNCTION_NAME" \
+              --query LastUpdateStatusReason --output text)
+            echo "::error::The Lambda update did not finish: $reason"
+            exit 1
+          fi
 
       - name: Deploy worker (ECS)
         run: |
@@ -129,13 +125,14 @@ jobs:
         run: |
           aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_WORKER_SERVICE"
 
+      # The first request starts a new instance (imports, migrations), hence the long timeout.
       - name: Smoke-test the API
         run: |
-          url=$(aws apprunner describe-service \
-            --service-arn "$APP_RUNNER_SERVICE_ARN" \
-            --query Service.ServiceUrl --output text)
+          url=$(aws lambda get-function-url-config \
+            --function-name "$API_FUNCTION_NAME" \
+            --query FunctionUrl --output text)
           for _ in $(seq 1 12); do
-            if curl --fail --silent --show-error --max-time 10 "https://$url/health"; then
+            if curl --fail --silent --show-error --max-time 60 "${url%/}/health"; then
               echo
               exit 0
             fi

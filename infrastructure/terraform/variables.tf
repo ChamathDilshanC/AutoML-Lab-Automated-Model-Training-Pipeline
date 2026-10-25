@@ -52,7 +52,7 @@ variable "tags" {
 }
 
 variable "frontend_origins" {
-  description = "Browser origins of the deployed frontend, e.g. [\"https://automl-lab.vercel.app\"]. Allowed by the API's CORS and by the bucket's CORS."
+  description = "Extra browser origins of a deployed frontend, e.g. [\"https://automl-lab.vercel.app\"]. Allowed by the API's CORS and by the bucket's CORS. The Amplify branch's origin is added automatically when enable_frontend is true."
   type        = list(string)
   default     = []
 
@@ -128,21 +128,50 @@ variable "db_skip_final_snapshot" {
 }
 
 variable "enable_compute" {
-  description = "Create the compute layer: the App Runner VPC connector and service, and the ECS worker service. Leave false for the first apply: the services need an image in ECR, which exists only after the first push (docs/DEPLOYMENT.md, Apply order). Also keep it false while App Runner is not yet activated for a new account (SubscriptionRequiredException); with false, Terraform makes no App Runner call."
+  description = "Create the compute layer: the API's Lambda function and Function URL, and the ECS worker service. Leave false for the first apply: both need an image in ECR, which exists only after the first push (docs/DEPLOYMENT.md, Apply order)."
   type        = bool
   default     = false
 }
 
-variable "api_cpu" {
-  description = "App Runner vCPU units (256, 512, 1024, 2048 or 4096)."
-  type        = string
-  default     = "1024"
+variable "api_memory_mb" {
+  description = "Memory of the API's Lambda function in MiB; Lambda gives CPU in proportion. Models of up to 200 MB are loaded into memory, so keep at least 2048."
+  type        = number
+  default     = 2048
+
+  validation {
+    condition     = var.api_memory_mb >= 128 && var.api_memory_mb <= 10240
+    error_message = "Lambda allows 128 to 10240 MiB."
+  }
 }
 
-variable "api_memory" {
-  description = "App Runner memory in MiB (2048 is the least for 1024 CPU units)."
+variable "api_timeout_seconds" {
+  description = "Longest an API request may run on Lambda, in seconds. Validating a dataset or loading a model on a cold start takes the longest."
+  type        = number
+  default     = 60
+
+  validation {
+    condition     = var.api_timeout_seconds >= 1 && var.api_timeout_seconds <= 900
+    error_message = "Lambda allows 1 to 900 seconds."
+  }
+}
+
+variable "enable_frontend" {
+  description = "Create the Amplify Hosting app and branch for the frontend (frontend.tf). Needs amplify_github_token on the apply that creates them."
+  type        = bool
+  default     = false
+}
+
+variable "amplify_github_token" {
+  description = "GitHub personal access token Amplify uses once to connect the repository through the Amplify GitHub App. Pass it as the TF_VAR_amplify_github_token environment variable, never in a file. Only the apply that creates the app needs it; it is kept in the Terraform state."
   type        = string
-  default     = "2048"
+  default     = null
+  sensitive   = true
+}
+
+variable "amplify_branch" {
+  description = "Git branch that Amplify builds and serves."
+  type        = string
+  default     = "main"
 }
 
 variable "worker_cpu" {
@@ -169,13 +198,13 @@ variable "worker_desired_count" {
 }
 
 variable "trusted_proxy_hops" {
-  description = "Proxies in front of the API that append to X-Forwarded-For (App Runner is one). Used for the per-client sign-in limit."
+  description = "Proxies in front of the API that append to X-Forwarded-For (the Lambda Function URL is one). Used for the per-client sign-in limit."
   type        = number
   default     = 1
 }
 
 variable "log_retention_days" {
-  description = "How long worker logs are kept."
+  description = "How long worker and API logs are kept, in days."
   type        = number
   default     = 14
 }

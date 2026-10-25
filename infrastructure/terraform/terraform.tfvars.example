@@ -6,9 +6,13 @@ allowed_origins = ["http://localhost:3000"]
 github_repository  = "ChamathDilshanC/AutoML-Lab-Automated-Model-Training-Pipeline"
 budget_alert_email = "you@example.com"
 
-# After the Vercel project exists.
+# Only if the frontend also runs on Vercel (the Amplify origin is added automatically).
 # frontend_origins = ["https://your-project.vercel.app"]
 
-# Second and third apply (README.md, "Apply order").
+# Second and third apply (docs/DEPLOYMENT.md, "Apply order").
 # enable_compute       = true
 # worker_desired_count = 1
+
+# Frontend on Amplify Hosting. The GitHub token never goes in this file: on the apply that creates
+# the app, run `export TF_VAR_amplify_github_token=<token>` first.
+# enable_frontend = true

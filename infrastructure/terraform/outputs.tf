@@ -50,8 +50,18 @@ output "database_endpoint" {
 }
 
 output "api_url" {
-  description = "Public URL of the API once enable_compute is true. Use it as NEXT_PUBLIC_API_BASE_URL in Vercel."
-  value       = var.enable_compute ? "https://${aws_apprunner_service.api[0].service_url}" : null
+  description = "Public URL of the API (the Lambda Function URL, no trailing slash) once enable_compute is true. Amplify gets it automatically; elsewhere, for example in Vercel, set it as NEXT_PUBLIC_API_BASE_URL."
+  value       = local.api_url
+}
+
+output "frontend_url" {
+  description = "Address of the Amplify-hosted frontend once enable_frontend is true. It is already allowed by the API's and the bucket's CORS."
+  value       = local.amplify_origin
+}
+
+output "amplify_app_id" {
+  description = "Amplify app ID, for starting a build (aws amplify start-job --app-id <id> --branch-name <branch> --job-type RELEASE)."
+  value       = var.enable_frontend ? aws_amplify_app.frontend[0].id : null
 }
 
 output "github_deploy_role_arn" {
@@ -65,7 +75,7 @@ output "github_variables" {
     AWS_REGION=${var.region}
     AWS_DEPLOY_ROLE_ARN=${aws_iam_role.deploy.arn}
     ECR_REPOSITORY=${aws_ecr_repository.backend.name}
-    APP_RUNNER_SERVICE_ARN=${var.enable_compute ? aws_apprunner_service.api[0].arn : "(available after enable_compute = true)"}
+    API_FUNCTION_NAME=${local.api_function_name}
     ECS_CLUSTER=${aws_ecs_cluster.main.name}
     ECS_WORKER_SERVICE=${var.name_prefix}-worker
     DEPLOY_ENABLED=true
