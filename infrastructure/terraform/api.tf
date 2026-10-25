@@ -1,5 +1,8 @@
-# The API on AWS App Runner. The service is created only when enable_compute is true, because App
-# Runner needs an image in ECR to start (README.md, "Apply order").
+# The API on AWS App Runner. Every App Runner resource (the VPC connector and the service) is
+# created only when enable_compute is true: the service needs an image in ECR to start
+# (docs/DEPLOYMENT.md, "Apply order"), and an account that App Runner has not yet activated rejects
+# every App Runner call with SubscriptionRequiredException. The two IAM roles below are plain IAM
+# and are always created, so the deploy role and the base layer do not depend on App Runner.
 
 locals {
   # Non-secret settings shared by the API and the worker.
@@ -76,7 +79,11 @@ resource "aws_iam_role_policy" "api_secrets" {
   policy = data.aws_iam_policy_document.read_secrets.json
 }
 
+# Same count as the service, so the service's aws_apprunner_vpc_connector.api[0] always exists
+# whenever the service does.
 resource "aws_apprunner_vpc_connector" "api" {
+  count = var.enable_compute ? 1 : 0
+
   vpc_connector_name = "${var.name_prefix}-api"
   subnets            = aws_subnet.private[*].id
   security_groups    = [aws_security_group.api.id]
@@ -115,7 +122,7 @@ resource "aws_apprunner_service" "api" {
   network_configuration {
     egress_configuration {
       egress_type       = "VPC"
-      vpc_connector_arn = aws_apprunner_vpc_connector.api.arn
+      vpc_connector_arn = aws_apprunner_vpc_connector.api[0].arn
     }
 
     ingress_configuration {

@@ -152,6 +152,25 @@ def test_compute_is_off_until_asked_for_and_the_worker_starts_stopped(
     assert worker["desired_count"] == "${var.worker_desired_count}"
 
 
+def test_every_app_runner_resource_is_created_only_with_compute() -> None:
+    # A new account rejects every App Runner call (SubscriptionRequiredException) until AWS
+    # activates it, so enable_compute = false must leave no App Runner resource at all.
+    found = {
+        f"{kind}.{label}": body
+        for path in sorted(INFRA.glob("*.tf"))
+        for entry in load(path.name).get("resource", [])
+        for kind, labelled in entry.items()
+        if kind.startswith("aws_apprunner_")
+        for label, body in labelled.items()
+    }
+    assert set(found) >= {"aws_apprunner_service.api", "aws_apprunner_vpc_connector.api"}
+    for address, body in found.items():
+        assert body["count"] == "${var.enable_compute ? 1 : 0}", address
+    network = one(found["aws_apprunner_service.api"]["network_configuration"])
+    egress = one(network["egress_configuration"])
+    assert egress["vpc_connector_arn"] == "${aws_apprunner_vpc_connector.api[0].arn}"
+
+
 def test_a_shell_into_the_worker_is_off_unless_asked_for(tfvars: dict[str, Any]) -> None:
     assert tfvars["enable_ecs_exec"]["default"] is False
     worker = load("worker.tf")
