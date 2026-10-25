@@ -259,6 +259,79 @@ def test_amplify_builds_the_frontend_folder_and_gets_the_api_url() -> None:
     assert token["sensitive"] is True and token["default"] is None  # never in a file
 
 
+def test_the_worker_scales_between_zero_and_one_task_with_the_queue(
+    tfvars: dict[str, Any],
+) -> None:
+    scaling = load("worker_autoscaling.tf")
+    toggles = scaling["locals"][0]
+    assert toggles["worker_autoscaling"] == "${var.enable_compute && var.enable_worker_autoscaling}"
+    assert tfvars["enable_worker_autoscaling"]["default"] is True
+    target = blocks(scaling, "resource", "aws_appautoscaling_target")["worker"]
+    assert target["count"] == "${local.worker_autoscaling ? 1 : 0}"
+    assert (target["min_capacity"], target["max_capacity"]) == (0, 1)
+    assert target["scalable_dimension"] == "ecs:service:DesiredCount"
+    assert target["resource_id"] == (
+        "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.worker[0].name}"
+    )
+    assert "role_arn" not in target  # Application Auto Scaling's own service-linked role
+
+    def step(name: str) -> dict[str, Any]:
+        config = one(
+            blocks(scaling, "resource", "aws_appautoscaling_policy")[name][
+                "step_scaling_policy_configuration"
+            ]
+        )
+        assert config["adjustment_type"] == "ExactCapacity"  # never more than one task
+        return dict(one(config["step_adjustment"]))
+
+    assert step("worker_start") == {"metric_interval_lower_bound": 0, "scaling_adjustment": 1}
+    assert step("worker_stop") == {"metric_interval_upper_bound": 0, "scaling_adjustment": 0}
+
+
+def test_a_running_job_keeps_the_worker_up_and_missing_data_never_stops_it(
+    tfvars: dict[str, Any],
+) -> None:
+    scaling = load("worker_autoscaling.tf")
+    toggles = scaling["locals"][0]
+    # Waiting plus in flight: a job's message is in flight until the job has finished (the
+    # worker deletes it afterwards, see test_aws), so the queue never looks empty during a job.
+    assert toggles["queue_outstanding_metrics"] == {
+        "visible": "ApproximateNumberOfMessagesVisible",
+        "inflight": "ApproximateNumberOfMessagesNotVisible",
+    }
+    assert toggles["queue_outstanding_expression"] == "FILL(visible, 0) + FILL(inflight, 0)"
+    alarms = blocks(scaling, "resource", "aws_cloudwatch_metric_alarm")
+    start, stop = alarms["worker_queue_has_work"], alarms["worker_queue_idle"]
+    for alarm in (start, stop):
+        assert alarm["count"] == "${local.worker_autoscaling ? 1 : 0}"
+        assert one(alarm["metric_query"])["expression"] == "${local.queue_outstanding_expression}"
+        metric = one(one(one(alarm["dynamic"])["metric_query"]["content"])["metric"])
+        assert metric["dimensions"] == {"QueueName": "${aws_sqs_queue.experiments.name}"}
+        assert metric["period"] == 60 and metric["stat"] == "Maximum"
+        assert alarm["threshold"] == 0
+        assert alarm["treat_missing_data"] == "notBreaching"
+    assert start["comparison_operator"] == "GreaterThanThreshold"
+    assert start["alarm_actions"] == ["${aws_appautoscaling_policy.worker_start[0].arn}"]
+    assert stop["comparison_operator"] == "LessThanOrEqualToThreshold"
+    assert stop["alarm_actions"] == ["${aws_appautoscaling_policy.worker_stop[0].arn}"]
+    # Every one of the last N minutes must be idle, not just some of them.
+    assert stop["evaluation_periods"] == stop["datapoints_to_alarm"]
+    assert stop["evaluation_periods"] == "${var.worker_scale_in_idle_minutes}"
+    assert tfvars["worker_scale_in_idle_minutes"]["default"] == 5
+    # Terraform must not reset the count the autoscaler (or a person) set.
+    worker = blocks(load("worker.tf"), "resource", "aws_ecs_service")["worker"]
+    assert one(worker["lifecycle"])["ignore_changes"] == ["desired_count"]
+
+
+def test_the_queue_hides_a_job_for_exactly_as_long_as_the_worker_may_run_it() -> None:
+    # One variable drives both: the queue redelivers a message only once the reaper would also
+    # consider its job abandoned.
+    experiments = blocks(load("queue.tf"), "resource", "aws_sqs_queue")["experiments"]
+    assert experiments["visibility_timeout_seconds"] == "${var.job_timeout_seconds}"
+    env = load("api.tf")["locals"][0]["app_environment"]
+    assert env["JOB_TIMEOUT_SECONDS"] == "${tostring(var.job_timeout_seconds)}"
+
+
 def test_a_shell_into_the_worker_is_off_unless_asked_for(tfvars: dict[str, Any]) -> None:
     assert tfvars["enable_ecs_exec"]["default"] is False
     worker = load("worker.tf")

@@ -1,6 +1,8 @@
 # The training worker on ECS Fargate, started from the same image as the API with the "worker"
-# command. The service exists only when enable_compute is true and runs worker_desired_count tasks;
-# the default is 0 so that nothing bills for compute until you start it (README.md).
+# command. The service exists only when enable_compute is true and is created with
+# worker_desired_count tasks (default 0, so nothing bills for compute until there is work). With
+# enable_worker_autoscaling it then starts and stops by itself with the experiments queue
+# (worker_autoscaling.tf, docs/WORKER_AUTOSCALING.md).
 
 resource "aws_ecs_cluster" "main" {
   name = "${var.name_prefix}-cluster"
@@ -134,6 +136,12 @@ resource "aws_ecs_service" "worker" {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.worker.id]
     assign_public_ip = true
+  }
+
+  lifecycle {
+    # After creation the task count belongs to Application Auto Scaling (worker_autoscaling.tf) or
+    # to whoever changes it by hand; an apply must not reset it while a job is running.
+    ignore_changes = [desired_count]
   }
 
   depends_on = [

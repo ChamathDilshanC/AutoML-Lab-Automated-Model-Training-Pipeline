@@ -472,6 +472,32 @@ def test_the_worker_runs_a_queued_job_and_deletes_the_message(
     assert queue_counts(aws) == (0, 0)  # deleted, not just hidden
 
 
+def test_the_message_stays_in_flight_until_training_has_finished(
+    aws: Aws,
+    s3_storage: S3Storage,
+    queue: SqsQueue,
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Worker autoscaling (infrastructure/terraform/worker_autoscaling.tf) scales the worker in only
+    # after the queue has had no visible and no in-flight message for five minutes. That is safe
+    # only because the message is deleted after the job, never when it is claimed.
+    experiment_id = "ex_" + "0" * 32
+    queue.publish(experiment_id)
+    message = queue.receive()
+    assert message is not None
+    seen_during_training: list[tuple[int, int]] = []
+    monkeypatch.setattr(jobs.repo, "claim_experiment", lambda session, eid: object())
+    monkeypatch.setattr(
+        jobs, "_run_claimed", lambda *args: seen_during_training.append(queue_counts(aws))
+    )
+
+    assert jobs.process_message(session_factory, s3_storage, queue, message) == "done"
+
+    assert seen_during_training == [(0, 1)]  # still in flight while the job ran
+    assert queue_counts(aws) == (0, 0)  # deleted only afterwards
+
+
 def test_a_duplicate_delivery_runs_nothing_twice(
     client: TestClient,
     aws: Aws,

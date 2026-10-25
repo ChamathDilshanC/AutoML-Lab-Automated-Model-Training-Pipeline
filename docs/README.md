@@ -25,6 +25,7 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Metadata entities, relationships, indexing, retention |
 | [SECURITY.md](SECURITY.md) | Threat model, controls, IAM, secrets, privacy |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Environments, AWS deployment steps, CI/CD, cost and teardown |
+| [WORKER_AUTOSCALING.md](WORKER_AUTOSCALING.md) | How the worker starts and stops by itself with the queue: apply, test, override, troubleshoot, cost |
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Test layers, fixtures, invariants, quality gates |
 | [ROADMAP.md](ROADMAP.md) | Milestones M1–M8 with dependencies and exit criteria |
 
@@ -38,6 +39,7 @@ Documentation for **AutoML Lab — Automated Model Training Pipeline**. Back to 
 | [0005](ADR/0005-s3-storage-and-sqs-job-queue.md) | S3 storage, presigned uploads and an SQS job queue | Accepted (implemented in M6; not run against real AWS) |
 | [0006](ADR/0006-aws-deployment.md) | AWS deployment: App Runner, Fargate, RDS PostgreSQL and OIDC | Accepted (implemented in M8 and applied); partly superseded by 0007 |
 | [0007](ADR/0007-lambda-api-and-amplify-frontend.md) | The API on Lambda and the frontend on Amplify Hosting | Accepted (API live on Lambda; Amplify not applied) |
+| [0008](ADR/0008-worker-autoscaling-from-the-queue.md) | The worker scales between 0 and 1 task with the experiments queue | Accepted (implemented as code; not applied) |
 
 ## Requirement traceability
 PRD requirement IDs map to roadmap milestones in [ROADMAP.md](ROADMAP.md), to routes in [API_SPEC.md](API_SPEC.md), to screens in [DESIGN_SYSTEM.md § 8](DESIGN_SYSTEM.md#8-screen-inventory-proposed), and to test layers in [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
