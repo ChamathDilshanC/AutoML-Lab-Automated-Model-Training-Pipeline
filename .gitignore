@@ -28,12 +28,14 @@ out/
 /data/
 /artifacts/
 
-# Terraform
+# Terraform (state, variable files and saved plans can all hold secret values)
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
+*.tfvars.json
 tfplan
+*.tfplan
 
 # OS / editor
 .DS_Store

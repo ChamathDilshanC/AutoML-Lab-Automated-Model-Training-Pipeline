@@ -1,6 +1,6 @@
 # ADR 0006 — Deployment on AWS: App Runner, Fargate, RDS PostgreSQL and OIDC
 
-- **Status:** Accepted (implemented in M8). The infrastructure has **never been applied** to a real AWS account and the image has not been built outside CI: see "What is verified".
+- **Status:** Accepted (implemented in M8). **Partly superseded by [ADR 0007](0007-lambda-api-and-amplify-frontend.md):** the API now runs on Lambda instead of App Runner (closed to new customers), gets its secrets as Lambda environment variables, and the frontend can run on Amplify Hosting. The rest stands. The base layer has since been applied to one account; compute has not: see "What is verified".
 - **Date:** 2026-10-24
 
 ## Context

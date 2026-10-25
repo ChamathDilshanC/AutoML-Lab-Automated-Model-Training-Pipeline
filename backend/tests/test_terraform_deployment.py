@@ -4,9 +4,11 @@ Like test_terraform.py these parse the files; nothing is created and no AWS acco
 CI additionally runs the real `terraform validate`.
 """
 
+import textwrap
 from typing import Any
 
 import pytest
+import yaml
 
 from tests.hclutil import INFRA, blocks, load, one, variables
 
@@ -116,18 +118,32 @@ def test_the_api_reaches_aws_through_vpc_endpoints(network: dict[str, Any]) -> N
     assert endpoints["sqs"]["service_name"].endswith(".sqs")
 
 
-def test_secrets_are_generated_and_passed_by_reference() -> None:
+def test_secrets_are_generated_and_never_typed_into_a_file() -> None:
     secrets = blocks(load("secrets.tf"), "resource", "aws_ssm_parameter")
     assert {p["type"] for p in secrets.values()} == {"SecureString"}
     for parameter in secrets.values():  # generated, never typed into a file
         assert parameter["value"].startswith("${random_password.")
-    api = load("api.tf")
-    ref = api["locals"][0]
+    ref = load("api.tf")["locals"][0]
+    # The worker reads them by reference; the shared settings never carry them.
     assert set(ref["app_secrets"]) == {"DB_PASSWORD", "SECRET_KEY"}
     env = ref["app_environment"]
-    assert "DB_PASSWORD" not in env and "SECRET_KEY" not in env  # never plain env vars
+    assert "DB_PASSWORD" not in env and "SECRET_KEY" not in env
     assert env["ENVIRONMENT"] == "production" and env["DB_SSLMODE"] == "require"
     assert env["STORAGE_MODE"] == "s3" and env["JOB_MODE"] == "sqs"
+    # The Lambda API cannot reach Parameter Store (no NAT, no SSM endpoint; docs/ADR/0007), so it
+    # gets the same generated values, which never appear as literals.
+    lambda_env = ref["lambda_environment"]
+    assert "DB_PASSWORD = random_password.db.result" in lambda_env
+    assert "SECRET_KEY = random_password.jwt_secret.result" in lambda_env
+
+
+def test_the_lambda_environment_never_sets_the_reserved_region_variable() -> None:
+    # Lambda sets AWS_REGION itself and rejects a function that sets it.
+    lambda_env = load("api.tf")["locals"][0]["lambda_environment"]
+    assert 'for name, value in local.app_environment : name => value if name != "AWS_REGION"' in (
+        lambda_env
+    )
+    assert "AWS_REGION =" not in lambda_env
 
 
 def test_the_container_roles_carry_exactly_the_m6_policies() -> None:
@@ -145,30 +161,102 @@ def test_compute_is_off_until_asked_for_and_the_worker_starts_stopped(
 ) -> None:
     assert tfvars["enable_compute"]["default"] is False
     assert tfvars["worker_desired_count"]["default"] == 0
-    service = blocks(load("api.tf"), "resource", "aws_apprunner_service")["api"]
-    assert service["count"] == "${var.enable_compute ? 1 : 0}"
+    function = blocks(load("api.tf"), "resource", "aws_lambda_function")["api"]
+    assert function["count"] == "${var.enable_compute ? 1 : 0}"
     worker = blocks(load("worker.tf"), "resource", "aws_ecs_service")["worker"]
     assert worker["count"] == "${var.enable_compute ? 1 : 0}"
     assert worker["desired_count"] == "${var.worker_desired_count}"
 
 
-def test_every_app_runner_resource_is_created_only_with_compute() -> None:
-    # A new account rejects every App Runner call (SubscriptionRequiredException) until AWS
-    # activates it, so enable_compute = false must leave no App Runner resource at all.
-    found = {
+def _resources(prefix: str) -> dict[str, Any]:
+    return {
         f"{kind}.{label}": body
         for path in sorted(INFRA.glob("*.tf"))
         for entry in load(path.name).get("resource", [])
         for kind, labelled in entry.items()
-        if kind.startswith("aws_apprunner_")
+        if kind.startswith(prefix)
         for label, body in labelled.items()
     }
-    assert set(found) >= {"aws_apprunner_service.api", "aws_apprunner_vpc_connector.api"}
-    for address, body in found.items():
+
+
+def test_app_runner_is_gone_and_lambda_and_amplify_are_switched_by_their_variables(
+    tfvars: dict[str, Any],
+) -> None:
+    # App Runner is closed to new customers (docs/ADR/0007), so nothing may still create it.
+    assert not _resources("aws_apprunner_")
+    lambdas = _resources("aws_lambda_")
+    assert set(lambdas) == {
+        "aws_lambda_function.api",
+        "aws_lambda_function_url.api",
+        "aws_lambda_permission.api_url",
+        "aws_lambda_permission.api_url_invoke",
+    }
+    for address, body in lambdas.items():
         assert body["count"] == "${var.enable_compute ? 1 : 0}", address
-    network = one(found["aws_apprunner_service.api"]["network_configuration"])
-    egress = one(network["egress_configuration"])
-    assert egress["vpc_connector_arn"] == "${aws_apprunner_vpc_connector.api[0].arn}"
+    amplify = _resources("aws_amplify_")
+    assert set(amplify) == {"aws_amplify_app.frontend", "aws_amplify_branch.frontend"}
+    for address, body in amplify.items():
+        assert body["count"] == "${var.enable_frontend ? 1 : 0}", address
+    assert tfvars["enable_frontend"]["default"] is False
+
+
+def test_the_api_runs_in_the_private_subnets_behind_the_api_security_group() -> None:
+    function = blocks(load("api.tf"), "resource", "aws_lambda_function")["api"]
+    vpc = one(function["vpc_config"])
+    assert vpc["subnet_ids"] == "${aws_subnet.private[*].id}"  # no public address, no NAT needed
+    assert vpc["security_group_ids"] == ["${aws_security_group.api.id}"]
+    assert function["package_type"] == "Image"
+    assert one(function["image_config"])["command"] == ["api"]
+    # The deploy workflow owns which image runs; an apply must not roll it back.
+    assert one(function["lifecycle"])["ignore_changes"] == ["image_uri"]
+
+
+def test_the_url_is_public_but_the_function_cannot_be_invoked_directly() -> None:
+    api = load("api.tf")
+    url = blocks(api, "resource", "aws_lambda_function_url")["api"]
+    assert url["authorization_type"] == "NONE"  # the application checks the bearer token
+    assert "cors" not in url  # FastAPI answers CORS; two layers would send conflicting headers
+    permissions = blocks(api, "resource", "aws_lambda_permission")
+    by_action = {p["action"]: p for p in permissions.values()}
+    assert set(by_action) == {"lambda:InvokeFunctionUrl", "lambda:InvokeFunction"}
+    assert by_action["lambda:InvokeFunctionUrl"]["function_url_auth_type"] == "NONE"
+    # Without this condition principal "*" could call the Invoke API and skip the URL.
+    assert by_action["lambda:InvokeFunction"]["invoked_via_function_url"] is True
+
+
+def test_the_api_role_is_for_lambda_only_and_no_longer_reads_parameter_store() -> None:
+    api = load("api.tf")
+    role = blocks(api, "resource", "aws_iam_role")
+    assert set(role) == {"api"}  # the App Runner image-pull role is gone
+    assert '{Service = "lambda.amazonaws.com"}' in role["api"]["assume_role_policy"]
+    assert "apprunner" not in role["api"]["assume_role_policy"]
+    attachments = blocks(api, "resource", "aws_iam_role_policy_attachment")
+    assert {a["policy_arn"] for a in attachments.values()} == {
+        "${aws_iam_policy.api.arn}",
+        "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+    }
+    inline = blocks(api, "resource", "aws_iam_role_policy")
+    assert set(inline) == {"api_image_pull"}  # no read_secrets: the values arrive in the env
+    pull = one(blocks(api, "data", "aws_iam_policy_document")["api_image_pull"]["statement"])
+    assert pull["actions"] == ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+    assert pull["resources"] == ["${aws_ecr_repository.backend.arn}"]
+
+
+def test_amplify_builds_the_frontend_folder_and_gets_the_api_url() -> None:
+    frontend = load("frontend.tf")
+    app = blocks(frontend, "resource", "aws_amplify_app")["frontend"]
+    assert app["platform"] == "WEB_COMPUTE"
+    assert app["repository"] == "https://github.com/${var.github_repository}"
+    assert app["environment_variables"] == {"AMPLIFY_MONOREPO_APP_ROOT": "frontend"}
+    spec_text = app["build_spec"].removeprefix("<<-EOT").removesuffix("EOT")
+    spec = yaml.safe_load(textwrap.dedent(spec_text))
+    (application,) = spec["applications"]
+    assert application["appRoot"] == "frontend"
+    assert application["frontend"]["artifacts"]["baseDirectory"] == ".next"
+    branch = blocks(frontend, "resource", "aws_amplify_branch")["frontend"]
+    assert "NEXT_PUBLIC_API_BASE_URL = local.api_url" in branch["environment_variables"]
+    token = variables(load("variables.tf"))["amplify_github_token"]
+    assert token["sensitive"] is True and token["default"] is None  # never in a file
 
 
 def test_a_shell_into_the_worker_is_off_unless_asked_for(tfvars: dict[str, Any]) -> None:
@@ -191,8 +279,14 @@ def test_the_worker_task_runs_the_worker_command_with_secrets_by_reference() -> 
 
 def test_the_api_cors_comes_from_the_frontend_origins() -> None:
     env = load("api.tf")["locals"][0]["api_environment"]
-    assert env["CORS_ORIGINS"] == "${jsonencode(var.frontend_origins)}"
+    assert env["CORS_ORIGINS"] == "${jsonencode(local.frontend_origins)}"
     assert env["TRUSTED_PROXY_HOPS"] == "${tostring(var.trusted_proxy_hops)}"
+    # The given origins plus the Amplify branch, and nothing else (never "*").
+    origins = load("frontend.tf")["locals"][0]["frontend_origins"]
+    assert origins == (
+        "${distinct(concat(var.frontend_origins,"
+        " var.enable_frontend ? [local.amplify_origin] : []))}"
+    )
 
 
 def test_frontend_origins_must_be_origins_not_urls_with_paths(tfvars: dict[str, Any]) -> None:
@@ -256,5 +350,6 @@ def test_the_image_repository_scans_and_keeps_a_bounded_history() -> None:
 
 def test_providers_are_pinned_to_versions_that_have_the_resources_used() -> None:
     providers = one(one(load("versions.tf")["terraform"])["required_providers"])
-    assert providers["aws"]["version"] == ">= 5.81"  # OIDC thumbprints became optional in 5.81
+    # OIDC thumbprints became optional in 5.81; invoked_via_function_url arrived in 6.28.
+    assert providers["aws"]["version"] == ">= 6.28"
     assert providers["random"]["source"] == "hashicorp/random"

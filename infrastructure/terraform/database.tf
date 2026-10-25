@@ -25,6 +25,8 @@ resource "aws_security_group" "database" {
   tags = { Name = "${var.name_prefix}-database" }
 }
 
+# Used by the API's Lambda function. The description still names App Runner because changing a
+# security group's description replaces the group (and the database rules that refer to it).
 resource "aws_security_group" "api" {
   name        = "${var.name_prefix}-api"
   description = "API (App Runner VPC connector). No inbound traffic."

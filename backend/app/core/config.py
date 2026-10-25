@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60
     predict_rate_limit_per_minute: int = 60
     login_rate_limit_per_minute: int = 10
-    # How many reverse proxies sit in front of the API (App Runner adds one). 0 means none: the
-    # X-Forwarded-For header is then ignored, so a client cannot spoof its address.
+    # How many reverse proxies sit in front of the API (a Lambda Function URL adds one). 0 means
+    # none: the X-Forwarded-For header is then ignored, so a client cannot spoof its address.
     trusted_proxy_hops: int = 0
     # Where files live and how jobs reach the worker. The defaults need no AWS account
     # (docs/ADR/0001, docs/ADR/0005).

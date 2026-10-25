@@ -3,9 +3,9 @@
 #
 #   public subnets   internet gateway; the worker runs here with a public IP so it can pull its
 #                    image and reach AWS APIs. Its security group allows no inbound traffic.
-#   private subnets  no route to the internet; the database and the API's App Runner VPC connector
-#                    live here. The API reaches S3 through a gateway endpoint (no hourly charge)
-#                    and SQS through an interface endpoint (billed per hour and per GB).
+#   private subnets  no route to the internet; the database and the API's Lambda function live
+#                    here. The API reaches S3 through a gateway endpoint (no hourly charge) and SQS
+#                    through an interface endpoint (billed per hour and per GB).
 
 # The zones are not looked up: the lookup (ec2:DescribeAvailabilityZones) is denied by some
 # organizations' service control policies. By default the first two zones of the region are named

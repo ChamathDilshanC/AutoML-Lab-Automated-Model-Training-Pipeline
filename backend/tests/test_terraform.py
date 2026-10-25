@@ -68,9 +68,10 @@ def test_the_bucket_refuses_plain_http(main: dict[str, Any]) -> None:
 def test_cors_allows_browser_uploads_only_from_the_configured_origins(main: dict[str, Any]) -> None:
     config = blocks(main, "resource", "aws_s3_bucket_cors_configuration")["artifacts"]
     rule = one(config["cors_rule"])
-    # The local origin plus the deployed frontend's origins; never a literal "*".
+    # The local origin plus the deployed frontend's origins (frontend.tf); never a literal "*".
     assert (
-        rule["allowed_origins"] == "${distinct(concat(var.allowed_origins, var.frontend_origins))}"
+        rule["allowed_origins"]
+        == "${distinct(concat(var.allowed_origins, local.frontend_origins))}"
     )
     assert set(rule["allowed_methods"]) == {"PUT", "GET", "HEAD"}
     assert rule["allowed_headers"] == ["Content-Type"]

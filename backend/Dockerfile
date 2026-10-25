@@ -24,6 +24,12 @@ RUN python -c "import tomllib; print(chr(10).join(tomllib.load(open('pyproject.t
     && pip install -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
+# On AWS Lambda the API runs behind the Lambda Web Adapter, which turns each invocation into an HTTP
+# request to uvicorn (infrastructure/terraform/api.tf). Lambda starts it from /opt/extensions;
+# anywhere else (the ECS worker, docker compose, docker run) the file is never executed. Pinned by
+# the digest of the multi-arch 1.1.0 index.
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0@sha256:17cfd08eff1dfea3f6a9a1e9c65fdac80aa4919b6085e746615530f43f57d2f1 /lambda-adapter /opt/extensions/lambda-adapter
+
 COPY app ./app
 COPY automl ./automl
 COPY worker ./worker

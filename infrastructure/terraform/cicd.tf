@@ -71,14 +71,19 @@ data "aws_iam_policy_document" "deploy" {
       "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
       "ecr:PutImage",
+      # Lambda checks that whoever points a function at an image may read that image.
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
     ]
     resources = [aws_ecr_repository.backend.arn]
   }
 
+  # GetFunctionConfiguration is what `aws lambda wait function-updated` polls. The workflow limits
+  # what it prints, because the configuration includes the function's environment variables.
   statement {
     sid       = "ApiRollOut"
-    actions   = ["apprunner:StartDeployment", "apprunner:ListOperations", "apprunner:DescribeService"]
-    resources = ["arn:aws:apprunner:${var.region}:${data.aws_caller_identity.current.account_id}:service/${var.name_prefix}-api/*"]
+    actions   = ["lambda:UpdateFunctionCode", "lambda:GetFunctionConfiguration", "lambda:GetFunctionUrlConfig"]
+    resources = ["arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${local.api_function_name}"]
   }
 
   statement {

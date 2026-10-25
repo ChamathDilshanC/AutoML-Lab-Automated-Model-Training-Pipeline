@@ -1,6 +1,8 @@
-# The two secret values the containers need, as SSM SecureString parameters. They are passed to the
-# containers by reference (App Runner and ECS read them at start), never as plain environment
-# variables, so they do not appear in the service or task definition.
+# The two secret values the application needs, as SSM SecureString parameters. The worker gets them
+# by reference (ECS reads them when the task starts), so they do not appear in its task definition.
+# The API on Lambda cannot reach Parameter Store from the private subnets (no NAT, no SSM
+# endpoint), so it receives the same values as encrypted environment variables instead (api.tf,
+# docs/ADR/0007).
 
 resource "random_password" "jwt_secret" {
   length  = 64
