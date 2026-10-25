@@ -1,6 +1,6 @@
 # AWS infrastructure for AutoML Lab (Terraform)
 
-Two layers, both in this folder: the **cloud-mode resources** (M6: bucket, queue, IAM policies) and the **deployment resources** (M8: network, PostgreSQL, container registry, the API on Lambda, Fargate worker, Amplify frontend, GitHub deploy role, budget alert). The deployment layer has its own guide with the apply order, costs and teardown: **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)**. Read it before `terraform apply`; the Lambda function and the ECS service are created only when `enable_compute = true`, after the first image has been pushed, and the Amplify app only when `enable_frontend = true`. It has been applied to one AWS account and the API is live on Lambda ([DEPLOYMENT.md § Current deployment](../../docs/DEPLOYMENT.md#current-deployment)).
+Two layers, both in this folder: the **cloud-mode resources** (M6: bucket, queue, IAM policies) and the **deployment resources** (M8: network, PostgreSQL, container registry, the API on Lambda, the Fargate worker and its queue-driven autoscaling, an optional Amplify frontend, GitHub deploy role, budget alert). The deployment layer has its own guide with the apply order, costs and teardown: **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)**, and the worker's autoscaling has [docs/WORKER_AUTOSCALING.md](../../docs/WORKER_AUTOSCALING.md). Read them before `terraform apply`. The Lambda function, the ECS service and the autoscaling are created only when `enable_compute = true`, after the first image has been pushed. The optional Amplify app is created only when `enable_frontend = true`; the deployed frontend runs on Vercel instead ([ADR 0009](../../docs/ADR/0009-frontend-on-vercel.md)). It has been applied to one AWS account and the API is live on Lambda ([DEPLOYMENT.md § Current deployment](../../docs/DEPLOYMENT.md#current-deployment), [diagram](../../docs/architecture.png)).
 
 ## Cloud-mode resources (M6)
 
@@ -13,12 +13,12 @@ Creates the AWS resources for **cloud mode** (`STORAGE_MODE=s3`, `JOB_MODE=sqs`;
 | SQS standard queue + dead-letter queue | Hands experiments to the worker. Long polling, encryption, redrive to the dead-letter queue after 3 deliveries |
 | Three IAM **policies** | `api`, `worker` and `local-dev` (both together). Policies only: **no IAM user and no access key is created**, because keys in Terraform state are secrets |
 
-| *(M8)* VPC, RDS, ECR, Lambda, ECS, Amplify, OIDC role, budget | See [docs/DEPLOYMENT.md § 3](../../docs/DEPLOYMENT.md) for the file-by-file list |
+| *(M8)* VPC, RDS, ECR, Lambda, ECS and its autoscaling, optional Amplify, OIDC role, budget | See [docs/DEPLOYMENT.md § 3](../../docs/DEPLOYMENT.md) for the file-by-file list |
 
 Nothing here is created by running the application or its tests. Local mode (the default) needs no
 AWS account at all.
 
-> **Cost.** The M8 resources (database, the SQS endpoint, a running worker) are billed by the hour and are likely to exceed 10 USD a month if left on; the worker is off by default. The Lambda API and Amplify are billed per use. See [DEPLOYMENT.md](../../docs/DEPLOYMENT.md#cost-and-how-to-stop-it). These resources are billed per use and may or may not be covered by your account's free
+> **Cost.** The M8 resources (database, the SQS endpoint, a running worker) are billed by the hour and are likely to exceed 10 USD a month if left on; the worker runs only while the queue has work. The Lambda API (and Amplify, if enabled) are billed per use. See [DEPLOYMENT.md](../../docs/DEPLOYMENT.md#cost-and-how-to-stop-it). These resources are billed per use and may or may not be covered by your account's free
 > tier or free plan. Check the current AWS pricing and your account's terms first, set an AWS
 > Budget alert, and destroy the stack when you are done. Alerts are not a spending cap.
 

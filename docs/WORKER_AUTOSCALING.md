@@ -1,6 +1,6 @@
 # Worker autoscaling: the worker starts and stops by itself
 
-> **Status:** Implemented as code (`infrastructure/terraform/worker_autoscaling.tf`, [ADR 0008](ADR/0008-worker-autoscaling-from-the-queue.md)). **Not yet applied** to AWS: the timings below come from AWS documentation and the configuration, not from measurement. Update this page after the first real test.
+> **Status:** Implemented and merged (`infrastructure/terraform/worker_autoscaling.tf`, [ADR 0008](ADR/0008-worker-autoscaling-from-the-queue.md)). It takes effect with the next `terraform apply` (section 5); until then the worker's task count is set by hand. The timings below come from AWS documentation and the configuration, not from measurement. Update this page after the first real test. Diagram: [architecture.png](architecture.png), steps 5 and 6.
 
 Related: [DEPLOYMENT.md](DEPLOYMENT.md) · [ADR 0005 (S3 and SQS)](ADR/0005-s3-storage-and-sqs-job-queue.md) · [ADR 0008](ADR/0008-worker-autoscaling-from-the-queue.md)
 

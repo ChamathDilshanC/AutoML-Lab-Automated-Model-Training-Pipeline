@@ -1,6 +1,6 @@
 # ADR 0005 — S3 storage, presigned uploads and an SQS job queue
 
-- **Status:** Accepted (implemented in M6). Never run against a real AWS account: see "What is verified".
+- **Status:** Accepted (implemented in M6). The bucket and the queues are part of the applied AWS deployment and the live API runs in this mode (ADR 0007); "What is verified" below describes the checks made before that.
 - **Date:** 2026-10-24
 
 ## Context

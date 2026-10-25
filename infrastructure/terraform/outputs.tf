@@ -50,12 +50,12 @@ output "database_endpoint" {
 }
 
 output "api_url" {
-  description = "Public URL of the API (the Lambda Function URL, no trailing slash) once enable_compute is true. Amplify gets it automatically; elsewhere, for example in Vercel, set it as NEXT_PUBLIC_API_BASE_URL."
+  description = "Public URL of the API (the Lambda Function URL, no trailing slash) once enable_compute is true. Set it as NEXT_PUBLIC_API_BASE_URL in the Vercel project (an optional Amplify branch gets it automatically)."
   value       = local.api_url
 }
 
 output "frontend_url" {
-  description = "Address of the Amplify-hosted frontend once enable_frontend is true. It is already allowed by the API's and the bucket's CORS."
+  description = "Address of the optional Amplify-hosted frontend; null unless enable_frontend is true (the deployed frontend runs on Vercel). When set, it is already allowed by the API's and the bucket's CORS."
   value       = local.amplify_origin
 }
 

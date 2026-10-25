@@ -1,6 +1,6 @@
 # ADR 0008 — The worker scales between 0 and 1 task with the experiments queue
 
-- **Status:** Accepted. Supersedes the worker-count part of [ADR 0006](0006-aws-deployment.md) § 7 ("the worker starts stopped" and is started by hand). Implemented as code; **not applied** to AWS.
+- **Status:** Accepted. Supersedes the worker-count part of [ADR 0006](0006-aws-deployment.md) § 7 ("the worker starts stopped" and is started by hand). Merged to `main`; it takes effect with the next `terraform apply` (the local Terraform state had no autoscaling resources on 2026-10-26). Until then the worker's task count is set by hand.
 - **Date:** 2026-10-26
 
 ## Context
