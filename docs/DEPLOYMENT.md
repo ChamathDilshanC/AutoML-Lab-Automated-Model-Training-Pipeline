@@ -33,7 +33,7 @@ What exists, all in `infrastructure/terraform/`:
 |---|---|
 | `main.tf`, `queue.tf`, `iam.tf` (M6) | Private S3 bucket, SQS queue and dead-letter queue, least-privilege IAM policies for the API and the worker |
 | `network.tf` | VPC, two public and two private subnets, **no NAT gateway**, S3 gateway endpoint, SQS interface endpoint |
-| `database.tf` | RDS PostgreSQL `db.t4g.micro` (private, encrypted, TLS required, deletion protection, 7 days of backups) and the security groups |
+| `database.tf` | RDS PostgreSQL `db.t4g.micro` (private, encrypted, TLS required, deletion protection, 1 day of backups, the most the AWS Free plan allows; set `db_backup_retention_days` higher on a paid plan) and the security groups |
 | `secrets.tf` | Generated database password and token-signing key as SSM SecureString parameters |
 | `ecr.tf` | The image repository (scan on push, last 20 images kept) |
 | `api.tf` | App Runner service, VPC connector, the image-pull role and the API runtime role (M6 API policy attached) |
