@@ -26,9 +26,8 @@ locals {
 
 data "aws_iam_policy_document" "github_trust" {
   statement {
-    sid       = "GitHubActionsOidc"
-    actions   = ["sts:AssumeRoleWithWebIdentity"]
-    resources = ["*"]
+    sid     = "GitHubActionsOidc"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
 
     principals {
       type        = "Federated"

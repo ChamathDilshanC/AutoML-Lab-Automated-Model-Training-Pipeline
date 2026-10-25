@@ -110,9 +110,9 @@ variable "db_username" {
 }
 
 variable "db_backup_retention_days" {
-  description = "Days of automated backups to keep. 0 turns backups off."
+  description = "Days of automated backups to keep. 0 turns backups off. Accounts on the AWS Free plan are limited to 1 day (higher values fail with FreeTierRestrictionError); raise it once the account is on a paid plan."
   type        = number
-  default     = 7
+  default     = 1
 }
 
 variable "db_deletion_protection" {
