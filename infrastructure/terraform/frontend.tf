@@ -71,5 +71,8 @@ resource "aws_amplify_branch" "frontend" {
   enable_auto_build = true
 
   # Without compute there is no API URL yet; the app then falls back to its local default.
-  environment_variables = var.enable_compute ? { NEXT_PUBLIC_API_BASE_URL = local.api_url } : {}
+  environment_variables = var.enable_compute ? merge(
+    { NEXT_PUBLIC_API_BASE_URL = local.api_url },
+    var.supabase_url == null ? {} : { NEXT_PUBLIC_SUPABASE_URL = var.supabase_url },
+  ) : {}
 }

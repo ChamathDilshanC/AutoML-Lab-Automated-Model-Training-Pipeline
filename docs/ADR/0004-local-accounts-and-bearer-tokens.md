@@ -1,6 +1,6 @@
 # ADR 0004 — Local accounts with bearer tokens
 
-- **Status:** Accepted for local and self-hosted use (implemented in M7). The identity provider for a cloud deployment is still **Open**.
+- **Status:** Accepted for local and self-hosted password fallback (implemented in M7); cloud Google sign-in is defined by [ADR 0010](0010-google-sign-in-with-supabase.md).
 - **Date:** 2026-10-24
 
 ## Context

@@ -122,6 +122,8 @@ class User(Base):
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # stored lower-case
     password_hash: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    auth_subject: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 

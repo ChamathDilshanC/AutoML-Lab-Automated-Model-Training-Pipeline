@@ -102,6 +102,22 @@ Ways to cut spend, cheapest first:
 - Stop the database: `aws rds stop-db-instance --db-instance-identifier <id>` (RDS restarts it by itself after seven days).
 - Remove everything: see "Teardown".
 
+The worker uses Fargate Spot by default and the queue safely redelivers an interrupted job.
+Temporary objects tagged `lifecycle=temporary` expire after seven days. The SQS interface
+endpoint and private RDS remain provisioned because removing either would require a NAT gateway or
+a public database. See [ADR 0011](ADR/0011-cost-and-idle-shutdown.md) for the trade-off.
+
+### Google/Supabase setup (manual)
+
+1. Create a Supabase project for Auth only.
+2. In Google Cloud Console create a Web OAuth client and set its redirect URI to
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+3. In Supabase Authentication > Providers > Google, enter the client ID and secret.
+4. In Supabase Authentication > URL Configuration, set the site URL and allow the local
+   `http://localhost:3000/login` plus the deployed `/login` URL.
+5. Copy the Supabase project URL and JWT secret (or JWKS) into the deployment secret variables.
+   Set `NEXT_PUBLIC_SUPABASE_URL` in Vercel. Never commit these values.
+
 ### Teardown
 1. In the app, delete your datasets (this deletes their models), or set `force_destroy = true`.
 2. Set `db_deletion_protection = false` and `db_skip_final_snapshot = true` (only if you do not need the data) and `terraform apply`.

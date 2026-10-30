@@ -123,7 +123,12 @@ resource "aws_ecs_service" "worker" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.worker.arn
   desired_count   = var.worker_desired_count
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = var.enable_worker_spot ? "FARGATE_SPOT" : "FARGATE"
+    weight            = 1
+    base              = 0
+  }
 
   enable_execute_command = var.enable_ecs_exec
 
