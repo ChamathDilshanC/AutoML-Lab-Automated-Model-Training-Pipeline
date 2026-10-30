@@ -118,6 +118,19 @@ a public database. See [ADR 0011](ADR/0011-cost-and-idle-shutdown.md) for the tr
 5. Copy the Supabase project URL and JWT secret (or JWKS) into the deployment secret variables.
    Set `NEXT_PUBLIC_SUPABASE_URL` in Vercel. Never commit these values.
 
+### Linking existing password-user data
+
+After the existing password user has signed in with Google once, run this inside the private
+worker/ECS task:
+
+```bash
+python -m app.cli link-google <existing-username> <google-email>
+```
+
+The command merges the verified Google identity into the existing user and transfers that Google
+identity's datasets, experiments and models to the existing owner. It does not print tokens or
+passwords. Run it once; later Google sign-ins reuse the linked local user.
+
 ### Teardown
 1. In the app, delete your datasets (this deletes their models), or set `force_destroy = true`.
 2. Set `db_deletion_protection = false` and `db_skip_final_snapshot = true` (only if you do not need the data) and `terraform apply`.
