@@ -9,9 +9,13 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
 NUMERIC_STRATEGIES = ("mean", "median")
+
+
+def _replace_missing_categories(values: pd.DataFrame) -> pd.DataFrame:
+    return values.astype(object).where(pd.notna(values), None)
 
 
 def split_column_types(X: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -48,7 +52,8 @@ def build_preprocessor(X: pd.DataFrame, numeric_strategy: str = "median") -> Col
     if categorical:
         categorical_pipeline = Pipeline(
             [
-                ("impute", SimpleImputer(strategy="most_frequent")),
+                ("normalize_missing", FunctionTransformer(_replace_missing_categories)),
+                ("impute", SimpleImputer(missing_values=None, strategy="most_frequent")),
                 ("encode", OneHotEncoder(handle_unknown="ignore")),
             ]
         )
