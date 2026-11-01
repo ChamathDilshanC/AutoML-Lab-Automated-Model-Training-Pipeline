@@ -9,6 +9,7 @@ import {
   sendFile,
   validateDataset,
 } from "@/lib/api";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 
 type Phase = "idle" | "preparing" | "uploading" | "validating";
 
@@ -25,11 +26,15 @@ export default function DatasetUploader() {
     if (!file || busy) return;
     setError(null);
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Only .csv files are supported.");
+      const message = "Only .csv files are supported.";
+      setError(message);
+      notifyError("Upload rejected", message);
       return;
     }
     if (file.size === 0) {
-      setError("The file is empty.");
+      const message = "The file is empty.";
+      setError(message);
+      notifyError("Upload rejected", message);
       return;
     }
     let datasetId: string | null = null;
@@ -42,9 +47,12 @@ export default function DatasetUploader() {
       await sendFile(registered.upload, file, setProgress);
       setPhase("validating");
       await validateDataset(registered.dataset_id);
+      notifySuccess("Dataset uploaded", "Your CSV is ready for an experiment.");
       router.push(`/datasets/${registered.dataset_id}`);
     } catch (err) {
-      setError(errorMessage(err));
+      const message = errorMessage(err);
+      setError(message);
+      notifyError("Dataset upload failed", message);
       setPhase("idle");
       // Do not leave a record that is waiting for a file that never arrived.
       if (datasetId) void deleteDataset(datasetId).catch(() => undefined);

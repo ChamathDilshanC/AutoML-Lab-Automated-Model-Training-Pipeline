@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DataQualityReport from "@/components/DataQualityReport";
 import { deleteDataset, errorMessage, getDataset, validateDataset } from "@/lib/api";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 import type { Dataset } from "@/lib/types";
 
 type View =
@@ -40,7 +41,9 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
       await validateDataset(datasetId);
       setReloadKey((key) => key + 1);
     } catch (err) {
-      setActionError(errorMessage(err));
+      const message = errorMessage(err);
+      setActionError(message);
+      notifyError("Validation failed", message);
     } finally {
       setValidating(false);
     }
@@ -51,9 +54,12 @@ export default function DatasetDetail({ datasetId }: { datasetId: string }) {
     setDeleteError(null);
     try {
       await deleteDataset(datasetId);
+      notifySuccess("Dataset deleted");
       router.push("/datasets/new");
     } catch (err) {
-      setDeleteError(errorMessage(err));
+      const message = errorMessage(err);
+      setDeleteError(message);
+      notifyError("Dataset deletion failed", message);
       setDeleting(false);
     }
   }

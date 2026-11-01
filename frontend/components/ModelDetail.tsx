@@ -7,6 +7,7 @@ import PredictionForm from "@/components/PredictionForm";
 import StatusBadge from "@/components/StatusBadge";
 import { approveModel, errorMessage, getModel, revokeModel } from "@/lib/api";
 import { algorithmLabel, formatNumber, metricLabel } from "@/lib/format";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 import type { FeatureSpec, RegisteredModel } from "@/lib/types";
 
 type View =
@@ -50,8 +51,11 @@ export default function ModelDetail({ modelId }: { modelId: string }) {
       const model = kind === "approve" ? await approveModel(modelId) : await revokeModel(modelId);
       setView({ phase: "ready", model });
       setDialog(null);
+      notifySuccess(kind === "approve" ? "Model approved" : "Model revoked");
     } catch (err) {
-      setActionError(errorMessage(err));
+      const message = errorMessage(err);
+      setActionError(message);
+      notifyError("Model update failed", message);
     } finally {
       setBusy(false);
     }
