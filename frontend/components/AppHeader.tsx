@@ -8,11 +8,14 @@ export default function AppHeader() {
   const link = "underline-offset-4 hover:underline";
 
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="sticky top-0 z-20 border-b border-border/80 bg-bg/85 shadow-sm backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <nav aria-label="Main" className="flex flex-wrap items-center gap-4">
-          <Link href="/" className="font-semibold">
-            AutoML Lab
+          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-sm font-bold text-on-accent shadow-lg shadow-accent/20">
+              AI
+            </span>
+            <span>AutoML Lab</span>
           </Link>
           <Link href="/datasets/new" className={link}>
             Upload dataset
@@ -29,7 +32,7 @@ export default function AppHeader() {
             <button
               type="button"
               onClick={signOut}
-              className="rounded-md border border-border px-3 py-1 font-medium"
+              className="rounded-xl border border-border bg-bg px-3 py-1.5 font-medium transition hover:border-accent hover:text-accent"
             >
               Sign out
             </button>

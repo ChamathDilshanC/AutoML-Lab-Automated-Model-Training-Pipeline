@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { errorMessage, getMe, googleLogin, login } from "@/lib/api";
 import { clearToken, getToken, setToken, subscribe } from "@/lib/auth";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 
 export type AuthState =
   | { status: "loading" }
@@ -45,7 +46,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       .catch((err) => {
         // A 401 has already signed the user out (see lib/api.ts). Anything else, such as the
         // server being down, must not sign them out: show an error with a retry instead.
-        if (!cancelled && getToken()) setFailure({ token, message: errorMessage(err) });
+        if (!cancelled && getToken()) {
+          const message = errorMessage(err);
+          setFailure({ token, message });
+          notifyError("Session check failed", message);
+        }
       });
     return () => {
       cancelled = true;
@@ -65,12 +70,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     signIn: async (username, password) => {
       const { access_token } = await login(username, password);
       setToken(access_token);
+      notifySuccess("Signed in", "Welcome back to AutoML Lab.");
     },
     signInWithGoogle: async (supabaseToken) => {
       const { access_token } = await googleLogin(supabaseToken);
       setToken(access_token);
+      notifySuccess("Google sign-in complete", "Your workspace is ready.");
     },
-    signOut: () => clearToken(),
+    signOut: () => {
+      clearToken();
+      notifySuccess("Signed out");
+    },
     retry: () => {
       setFailure(null);
       setAttempt((n) => n + 1);

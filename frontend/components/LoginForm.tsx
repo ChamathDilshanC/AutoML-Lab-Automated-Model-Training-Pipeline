@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { errorMessage } from "@/lib/api";
 import { safeNextPath } from "@/lib/auth";
+import { notifyError } from "@/lib/notifications";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -28,14 +29,22 @@ export default function LoginForm() {
     if (!accessToken && !providerError) return;
     window.history.replaceState(null, "", `/login${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}`);
     if (providerError) {
-      queueMicrotask(() => setError("Google sign-in was cancelled or failed. Please try again."));
+      queueMicrotask(() => {
+        const message = "Google sign-in was cancelled or failed. Please try again.";
+        setError(message);
+        notifyError("Google sign-in failed", message);
+      });
       return;
     }
     if (!accessToken) return;
     queueMicrotask(() => {
       setSubmitting(true);
       signInWithGoogle(accessToken)
-        .catch((err) => setError(errorMessage(err)))
+        .catch((err) => {
+          const message = errorMessage(err);
+          setError(message);
+          notifyError("Unable to sign in with Google", message);
+        })
         .finally(() => setSubmitting(false));
     });
   }, [next, signInWithGoogle]);
@@ -43,7 +52,9 @@ export default function LoginForm() {
   function startGoogleSignIn() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!url) {
-      setError("Google sign-in is not configured.");
+      const message = "Google sign-in is not configured.";
+      setError(message);
+      notifyError("Google sign-in unavailable", message);
       return;
     }
     const redirect = new URL("/login", window.location.origin);

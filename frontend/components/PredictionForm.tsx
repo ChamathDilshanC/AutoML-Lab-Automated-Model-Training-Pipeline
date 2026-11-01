@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { errorMessage, predict } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
+import { notifyError } from "@/lib/notifications";
 import type {
   FeatureSpec,
   FeatureValue,
@@ -123,6 +124,7 @@ export default function PredictionForm({ model }: { model: RegisteredModel }) {
     const built = toInstance(model.feature_schema, values);
     if ("error" in built) {
       setError(built.error);
+      notifyError("Prediction input is invalid", built.error);
       return;
     }
     setSubmitting(true);
@@ -130,7 +132,9 @@ export default function PredictionForm({ model }: { model: RegisteredModel }) {
       setResult(await predict(model.model_id, [built.instance]));
     } catch (err) {
       setResult(null);
-      setError(errorMessage(err));
+      const message = errorMessage(err);
+      setError(message);
+      notifyError("Prediction failed", message);
     } finally {
       setSubmitting(false);
     }

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createExperiment, errorMessage, getDataset, getExperimentOptions } from "@/lib/api";
 import { algorithmLabel, directionText, metricLabel } from "@/lib/format";
+import { notifyError } from "@/lib/notifications";
 import type { Dataset, ExperimentOptions, Task } from "@/lib/types";
 
 type Loaded =
@@ -98,11 +99,15 @@ export default function ExperimentForm() {
     event.preventDefault();
     setError(null);
     if (!target) {
-      setError("Choose a target column.");
+      const message = "Choose a target column.";
+      setError(message);
+      notifyError("Experiment needs a target", message);
       return;
     }
     if (algorithms.length === 0) {
-      setError("Choose at least one algorithm.");
+      const message = "Choose at least one algorithm.";
+      setError(message);
+      notifyError("Choose an algorithm", message);
       return;
     }
     setSubmitting(true);
@@ -121,7 +126,9 @@ export default function ExperimentForm() {
       );
       router.push(`/experiments/${experiment.experiment_id}`);
     } catch (err) {
-      setError(errorMessage(err));
+      const message = errorMessage(err);
+      setError(message);
+      notifyError("Experiment creation failed", message);
       setSubmitting(false);
     }
   }
