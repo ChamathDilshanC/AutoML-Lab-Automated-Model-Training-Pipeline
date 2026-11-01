@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Request
@@ -18,6 +19,7 @@ from app.db.session import get_session
 from app.schemas.auth import GoogleTokenRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -99,7 +101,8 @@ def google_login(
         elif user.email != email:
             user.email = email
             session.commit()
-    except SupabaseTokenError:
+    except SupabaseTokenError as exc:
+        logger.warning("Google token verification failed: %s", exc)
         record_audit(session, "auth.google_login", actor_id=None, outcome="failure")
         raise unauthenticated("Unable to sign in with Google.") from None
 
