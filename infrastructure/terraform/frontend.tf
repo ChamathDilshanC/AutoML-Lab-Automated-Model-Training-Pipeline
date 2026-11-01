@@ -1,5 +1,6 @@
-# The frontend on AWS Amplify Hosting, built from frontend/ in the GitHub repository on every push to
-# amplify_branch (docs/ADR/0007). Created only when enable_frontend is true.
+# Optional: the frontend on AWS Amplify Hosting, built from frontend/ in the GitHub repository on
+# every push to amplify_branch (docs/ADR/0007). Created only when enable_frontend is true, which is
+# off by default: the deployed frontend runs on Vercel (docs/ADR/0009).
 #
 # Amplify documents Next.js support for versions 12 to 15 and lists streaming as unsupported; this
 # app is on Next.js 16 and streams with <Suspense>. Check the first build and the pages before

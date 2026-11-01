@@ -7,7 +7,7 @@ Sole listed maintainer: **ChamathDilshanC** ([@ChamathDilshanC](https://github.c
 Coding agents must also follow [AGENTS.md](AGENTS.md).
 
 ## 1. Setup and prerequisites
-Python 3.11+ and Node 20.9+ (developed with Node 24). Install and run commands are in [AGENTS.md § 5](AGENTS.md#5-commands) and the [README](README.md). The planned stack is Python (FastAPI, scikit-learn), Next.js, and optional AWS services. Do not add commands to docs that you have not run.
+Python 3.11+ and Node 20.9+ (developed with Node 24). Install and run commands are in [AGENTS.md § 5](AGENTS.md#5-commands) and the [README](README.md). The stack is Python (FastAPI, scikit-learn), Next.js, and AWS for the deployment; the README's [Tech stack](README.md#tech-stack) lists it all. Do not add commands to docs that you have not run.
 
 ## 2. Workflow
 1. Open or find an issue describing the change.

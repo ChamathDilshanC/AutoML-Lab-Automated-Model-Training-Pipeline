@@ -1,6 +1,6 @@
 # ADR 0007 — The API on Lambda and the frontend on Amplify Hosting
 
-- **Status:** Accepted. Supersedes [ADR 0006](0006-aws-deployment.md) § 1 for the API and the frontend, § 5 for how the API gets its secrets, and the App Runner parts of §§ 4, 6, 7 and 9. Implemented and applied: the API has been live on Lambda since 2026-10-26 (deployed by hand). Amplify has not been applied; the frontend runs on Vercel.
+- **Status:** Accepted. Supersedes [ADR 0006](0006-aws-deployment.md) § 1 for the API and the frontend, § 5 for how the API gets its secrets, and the App Runner parts of §§ 4, 6, 7 and 9. Implemented and applied: the API has been live on Lambda since 2026-10-26 (deployed by hand). § 5 (Amplify Hosting) stays optional and unused: the frontend runs on Vercel ([ADR 0009](0009-frontend-on-vercel.md)).
 - **Date:** 2026-10-25
 
 ## Context

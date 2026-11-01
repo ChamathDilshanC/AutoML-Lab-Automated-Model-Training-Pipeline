@@ -16,6 +16,7 @@ budget_alert_email = "you@example.com"
 # enable_worker_autoscaling    = true
 # worker_scale_in_idle_minutes = 5
 
-# Frontend on Amplify Hosting. The GitHub token never goes in this file: on the apply that creates
-# the app, run `export TF_VAR_amplify_github_token=<token>` first.
+# Optional, not used by the current deployment (the frontend runs on Vercel): Amplify Hosting. The
+# GitHub token never goes in this file: on the apply that creates the app, run
+# `export TF_VAR_amplify_github_token=<token>` first.
 # enable_frontend = true

@@ -52,13 +52,13 @@ variable "tags" {
 }
 
 variable "frontend_origins" {
-  description = "Extra browser origins of a deployed frontend, e.g. [\"https://automl-lab.vercel.app\"]. Allowed by the API's CORS and by the bucket's CORS. The Amplify branch's origin is added automatically when enable_frontend is true."
+  description = "Browser origins of the deployed frontend, e.g. the Vercel project [\"https://automl-lab-ui.vercel.app\"]. Allowed by the API's CORS and by the bucket's CORS. An optional Amplify branch's origin is added automatically when enable_frontend is true."
   type        = list(string)
   default     = []
 
   validation {
     condition     = alltrue([for origin in var.frontend_origins : can(regex("^https?://[^/]+$", origin))])
-    error_message = "Each origin is a scheme and host with no path and no trailing slash, e.g. https://automl-lab.vercel.app."
+    error_message = "Each origin is a scheme and host with no path and no trailing slash, e.g. https://automl-lab-ui.vercel.app."
   }
 }
 
@@ -156,7 +156,7 @@ variable "api_timeout_seconds" {
 }
 
 variable "enable_frontend" {
-  description = "Create the Amplify Hosting app and branch for the frontend (frontend.tf). Needs amplify_github_token on the apply that creates them."
+  description = "Optional: create an Amplify Hosting app and branch for the frontend (frontend.tf). Off by default; the deployed frontend runs on Vercel (docs/ADR/0009). Needs amplify_github_token on the apply that creates them."
   type        = bool
   default     = false
 }
