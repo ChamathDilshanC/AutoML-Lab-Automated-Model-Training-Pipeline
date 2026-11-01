@@ -1,8 +1,10 @@
 # Design System
 
-> **Status:** only the sign-in, dataset, experiment and model pages exist (M2, M4, M5, M7); everything else here is **Proposed**. Tokens listed are starting values to be implemented as CSS variables / theme tokens in the Next.js app; none of them exist in code today. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
+> **Status:** the sign-in page, the dashboard and the dataset, experiment and model pages exist (M2, M4, M5, M7 and the 2026-11-01 UI refresh); anything not marked **Implemented** here is **Proposed**. The light colour tokens in § 4 are CSS variables in `frontend/app/globals.css`. Contrast ratios were computed with the WCAG 2.x relative-luminance formula during authoring.
 
-**Implemented (M2, M4, M5, M7):** the colour tokens below are CSS variables in `frontend/app/globals.css` with a `prefers-color-scheme` dark theme (no manual override yet), plus `StatusBadge` (dataset and experiment statuses), `DatasetUploader`, `DataQualityReport`, `ExperimentForm`, `ExperimentDetail` (polls every 2 seconds until the experiment finishes, announced through a polite live region) and `Leaderboard` (rank, best-run badge with text and icon, primary metric emphasised with a direction arrow, all metrics, failed runs listed separately), `ModelList`, `ModelDetail` (approval with an inline confirmation step) and `PredictionForm` (fields generated from the model's feature schema: number inputs, selects for known categories and booleans, text otherwise; a blank field is sent as missing; unparsable numbers are blocked by the browser's own validation), `LoginForm`, `AuthGate` (shows nothing of the app until the token is checked), `AppHeader` (navigation, the signed-in user, sign out) and `ConfirmDialog` (a native modal `<dialog>`: focus is trapped, Escape cancels, Cancel is focused first; used for approve, revoke and delete, with destructive actions in the danger colour), and the routes `/login`, `/datasets/new`, `/datasets/[id]`, `/experiments/new`, `/experiments/[id]`, `/models` and `/models/[id]`. Verified in a headless browser in light and dark; no automated UI tests yet.
+**Implemented (UI refresh, 2026-11-01):** a white (light-only) theme with a dashed grid background that fades in from the bottom-right corner, the AutoML Lab logo (`frontend/public/assets/Logo/`; cropped copies and the app icons are derived from `Auto ML Lab Logo.png`) in the header, footer, sign-in page and browser tab, a sticky header with an animated active-page indicator and a mobile menu, a footer on every page (logo, live backend status, workspace / documentation / project links, technology strip, back-to-top), a dashboard at `/` (workspace counts, recent models, quick actions, how it works, FAQ), a shared page width of 1280 px (`max-w-7xl`) with two-column layouts on wide screens, and toasts for every outcome (`goey-toast`, see § 12). Icons come from `react-icons`; animation from Motion (`motion`); and these free [Unlumen UI](https://ui.unlumen.com) components, copied into `frontend/components/unlumen-ui/` from the registry and adapted where noted in each file: Animate Count, Animate Digits, Animated List, Apple Switch, Cards View Icon, List View Icon, Hover Feature Cards, Motion FAQs Accordion, Sidebar Toggle Icon and Tilt Card. No Pro components are used. Verified in a headless browser at 1440 px and 390 px against a mocked API; no automated UI tests yet.
+
+**Implemented (M2, M4, M5, M7):** the colour tokens below are CSS variables in `frontend/app/globals.css`, plus `StatusBadge` (dataset and experiment statuses), `DatasetUploader`, `DataQualityReport`, `ExperimentForm`, `ExperimentDetail` (polls every 2 seconds until the experiment finishes, announced through a polite live region) and `Leaderboard` (rank, best-run badge with text and icon, primary metric emphasised with a direction arrow, all metrics, failed runs listed separately), `ModelList`, `ModelDetail` (approval with an inline confirmation step) and `PredictionForm` (fields generated from the model's feature schema: number inputs, selects for known categories and booleans, text otherwise; a blank field is sent as missing; unparsable numbers are blocked by the browser's own validation), `LoginForm`, `AuthGate` (shows nothing of the app until the token is checked), `AppHeader` (navigation, the signed-in user, sign out) and `ConfirmDialog` (a native modal `<dialog>`: focus is trapped, Escape cancels, Cancel is focused first; used for approve, revoke and delete, with destructive actions in the danger colour), and the routes `/login`, `/datasets/new`, `/datasets/[id]`, `/experiments/new`, `/experiments/[id]`, `/models` and `/models/[id]`.
 
 Related: [PRD](PRD.md) · [Architecture § 6.1](ARCHITECTURE.md#61-nextjs-frontend)
 
@@ -15,13 +17,15 @@ Related: [PRD](PRD.md) · [Architecture § 6.1](ARCHITECTURE.md#61-nextjs-fronte
 6. **Accessible without extras.** Colour is never the only carrier of meaning.
 
 ## 2. Visual direction
-Neutral, technical, light and dark themes, one accent colour, tabular numerals for metrics. No illustrative branding has been decided (logo and wordmark **TBD**).
+Neutral and technical on a white page, black ink for primary actions to match the black logo, one blue accent for links, focus and progress, and tabular numerals for metrics. Cards are white with soft borders and rounded corners; a dashed grid fades in from the bottom-right corner of the window. The logo and wordmark are in `frontend/public/assets/Logo/` (**Implemented**).
 
 ## 3. Theme strategy
-- Light and dark themes via semantic tokens; components consume tokens, never raw hex.
-- Default follows the OS (`prefers-color-scheme`) with a manual override stored per user in the browser.
+- **Implemented:** one light (white) theme, chosen by the maintainer on 2026-11-01. `color-scheme: light` is set and there is no dark theme, so the OS setting does not change the app.
+- Semantic tokens; components consume tokens, never raw hex. The Unlumen UI components use shadcn-style names (`--background`, `--foreground`, `--muted-foreground`, `--card`, `--secondary`, `--ring`), which `globals.css` maps onto the tokens below.
 
-## 4. Semantic colour tokens (Proposed)
+## 4. Semantic colour tokens
+The **Light** column is implemented. The **Dark** column is kept for reference only: the app has no dark theme (§ 3).
+
 | Token | Light | Dark | Use |
 |---|---|---|---|
 | `--bg` | `#FFFFFF` | `#0B1020` | Page background |
@@ -29,8 +33,11 @@ Neutral, technical, light and dark themes, one accent colour, tabular numerals f
 | `--text` | `#111827` | `#E5E7EB` | Body text |
 | `--text-muted` | `#4B5563` | `#9CA3AF` | Secondary text |
 | `--border` | `#D1D5DB` | `#2B3350` | Dividers and card outlines (added in M2; not a text colour) |
-| `--accent` | `#2563EB` | `#60A5FA` | Primary actions, links, focus ring |
+| `--primary` | `#0A0A0A` | – | Primary buttons, matching the black logo (added in the UI refresh) |
+| `--on-primary` | `#FFFFFF` | – | Text on primary fills |
+| `--accent` | `#2563EB` | `#60A5FA` | Links, focus ring, progress, active indicators |
 | `--on-accent` | `#FFFFFF` | `#0B1020` | Text on accent fills |
+| `--grid-line` | `#E7E5E4` | – | Lines of the dashed background grid (decorative) |
 | `--success` | `#15803D` | `#4ADE80` | `SUCCEEDED`, `READY` |
 | `--warning` | `#B45309` | `#FBBF24` | Data-quality warnings |
 | `--danger` | `#B91C1C` | `#F87171` | `FAILED`, `REJECTED`, destructive actions |
@@ -44,6 +51,7 @@ Measured contrast against the page background (text-size minimum 4.5:1):
 | `--text-muted` / `--bg` | 7.56 | 7.46 |
 | `--accent` / `--bg` | 5.17 | 7.45 |
 | `--on-accent` / `--accent` | 5.17 | 7.45 |
+| `--on-primary` / `--primary` | 19.80 | – |
 | `--danger` / `--bg` | 6.47 | 6.84 |
 | `--success` / `--bg` | 5.02 | 10.86 |
 | `--warning` / `--bg` | 5.02 | 11.34 |
@@ -129,12 +137,15 @@ Every interactive component defines: default, hover, focus-visible, active, disa
 - Long operations (upload, validation) show progress and remain cancellable where the API allows.
 
 ## 12. Notifications and feedback
+- **Implemented:** toasts use `goey-toast` (bottom-right, at most four at once, with a progress bar and close button), always through the helpers in `frontend/lib/notifications.ts`. Every outcome raises one: sign-in and sign-out, upload (a single toast that morphs from "Uploading" into its result) followed by the validation result, validation, dataset deletion, experiment creation, an experiment starting, finishing (with a "View model" action) or failing while its page is open, approval and revocation, predictions, copying a model ID, load failures and an unreachable backend. Inline alerts stay on the page as well, because a toast disappears. Toasts never contain secrets, and an error toast shows the same safe message as the inline error.
 - `Toast` for transient confirmations (auto-dismiss ≥ 5 s, pausable, `role="status"`).
 - Persistent `InlineAlert` for failures and data-quality warnings (`role="alert"` for blocking errors).
 - Experiment status updates are polled or pushed (**Open**) and announced via an `aria-live="polite"` region.
 
 ## 13. Motion
 Short (≤ 200 ms) transitions on state changes only. Honour `prefers-reduced-motion` by removing non-essential animation and replacing spinners with static text where practical.
+
+**Implemented:** animation uses Motion springs (the Unlumen UI components, the navigation indicator, progress bars, card transitions), several of which run longer than 200 ms. `MotionConfig reducedMotion="user"` turns off their movement when the OS asks for reduced motion, and a CSS rule shortens every CSS animation and transition to near zero. Spinners always sit next to text that says what is happening.
 
 ## 14. Accessibility checklist (target WCAG 2.2 AA)
 - Full keyboard operability; logical focus order; skip-to-content link.
@@ -154,4 +165,6 @@ Server-side pagination for datasets, experiments and models (shape: see [API_SPE
 - Lint rule or review checklist: new UI must use existing components before adding new ones.
 
 ## 17. Open decisions
-Logo/brand, font, chart palette, charting library, component library (build vs adopt), status update mechanism (polling vs push).
+Chart palette, charting library, status update mechanism (polling vs push).
+
+Decided on 2026-11-01: the logo in `frontend/public/assets/Logo/`, the Geist font, a light-only theme, and a component library that adopts free Unlumen UI components (copied into the codebase, never the Pro set) alongside the project's own components, with `react-icons` for icons.

@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import ModelDetail from "@/components/ModelDetail";
+import { Breadcrumbs, PageMain } from "@/components/PageHeader";
+import { LoadingState } from "@/components/ui/States";
 
 // Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
 export const instant = false;
@@ -14,20 +15,11 @@ async function ModelView({ params }: { params: Promise<{ id: string }> }) {
 
 export default function ModelPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
-      <nav aria-label="Breadcrumb" className="text-sm text-muted">
-        <Link href="/" className="underline">
-          Home
-        </Link>{" "}
-        ›{" "}
-        <Link href="/models" className="underline">
-          Models
-        </Link>{" "}
-        › Model
-      </nav>
-      <Suspense fallback={<p className="text-muted">Loading model…</p>}>
+    <PageMain className="gap-8">
+      <Breadcrumbs items={[{ label: "Models", href: "/models" }, { label: "Model" }]} />
+      <Suspense fallback={<LoadingState label="Loading model…" />}>
         <ModelView params={params} />
       </Suspense>
-    </main>
+    </PageMain>
   );
 }

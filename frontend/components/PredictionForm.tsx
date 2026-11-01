@@ -1,15 +1,21 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useState } from "react";
+import { LuMousePointerClick, LuSparkles, LuZap } from "react-icons/lu";
+import Alert from "@/components/ui/Alert";
+import Select from "@/components/ui/Select";
 import { errorMessage, predict } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
-import { notifyError } from "@/lib/notifications";
+import { notifyError, notifyPromise } from "@/lib/notifications";
 import type {
   FeatureSpec,
   FeatureValue,
   PredictionResponse,
   RegisteredModel,
 } from "@/lib/types";
+import { buttonClass, cardClass, fieldClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 /** The input for one feature, chosen from the model's feature schema. */
 function FeatureInput({
@@ -22,7 +28,6 @@ function FeatureInput({
   onChange: (next: string) => void;
 }) {
   const id = `feature-${spec.name}`;
-  const field = "rounded-md border border-border bg-bg px-3 py-2";
 
   let input: React.ReactNode;
   if (spec.value_type === "number") {
@@ -34,7 +39,7 @@ function FeatureInput({
         inputMode="decimal"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={field}
+        className={fieldClass}
       />
     );
   } else if (spec.value_type === "boolean" || spec.categories) {
@@ -46,19 +51,14 @@ function FeatureInput({
           ]
         : (spec.categories ?? []).map((category) => [category, category]);
     input = (
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={field}
-      >
+      <Select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">(leave blank)</option>
         {options.map(([optionValue, label]) => (
           <option key={optionValue} value={optionValue}>
             {label}
           </option>
         ))}
-      </select>
+      </Select>
     );
   } else {
     input = (
@@ -68,17 +68,17 @@ function FeatureInput({
         maxLength={200}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={field}
+        className={fieldClass}
       />
     );
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="font-medium">
-        {spec.name}{" "}
-        <span className="text-sm font-normal text-muted">
-          ({spec.value_type === "number" ? "number" : spec.value_type === "boolean" ? "true/false" : "text"})
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="flex items-baseline justify-between gap-2 text-sm font-medium">
+        <span className="break-all">{spec.name}</span>
+        <span className="shrink-0 text-xs font-normal text-muted">
+          {spec.value_type === "number" ? "number" : spec.value_type === "boolean" ? "true/false" : "text"}
         </span>
       </label>
       {input}
@@ -109,6 +109,10 @@ function toInstance(
   return { instance };
 }
 
+function predictionText(prediction: PredictionResponse["predictions"][number] | undefined): string {
+  return typeof prediction === "number" ? formatNumber(prediction, 4) : String(prediction);
+}
+
 export default function PredictionForm({ model }: { model: RegisteredModel }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [result, setResult] = useState<PredictionResponse | null>(null);
@@ -129,12 +133,18 @@ export default function PredictionForm({ model }: { model: RegisteredModel }) {
     }
     setSubmitting(true);
     try {
-      setResult(await predict(model.model_id, [built.instance]));
+      setResult(
+        await notifyPromise(predict(model.model_id, [built.instance]), {
+          loading: "Running the prediction",
+          success: "Prediction ready",
+          successDescription: (response) =>
+            `Predicted ${model.target_column}: ${predictionText(response.predictions[0])}`,
+          error: "Prediction failed",
+        }),
+      );
     } catch (err) {
       setResult(null);
-      const message = errorMessage(err);
-      setError(message);
-      notifyError("Prediction failed", message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -144,86 +154,115 @@ export default function PredictionForm({ model }: { model: RegisteredModel }) {
   const probabilities = result?.probabilities?.[0];
 
   return (
-    <section aria-labelledby="predict-title" className="flex flex-col gap-4">
-      <h2 id="predict-title" className="text-xl font-semibold">
-        Try a prediction
-      </h2>
+    <section aria-labelledby="predict-title" className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h2 id="predict-title" className="text-2xl font-semibold tracking-tight">
+          Try a prediction
+        </h2>
+        <p className="text-sm text-muted">
+          A blank field is sent as missing; the model fills it with a typical value from its
+          training data.
+        </p>
+      </div>
       {!approved && (
-        <p className="rounded-md border border-warning p-3">
-          <span aria-hidden="true">○ </span>
+        <Alert tone="warning">
           {model.approval_status === "REVOKED"
             ? "This model's approval was revoked, so it cannot make predictions."
             : "Approve this model to enable predictions."}
-        </p>
-      )}
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <fieldset disabled={!approved || submitting} className="flex flex-col gap-4">
-          <legend className="sr-only">Feature values</legend>
-          {model.feature_schema.map((spec) => (
-            <FeatureInput
-              key={spec.name}
-              spec={spec}
-              value={values[spec.name] ?? ""}
-              onChange={(next) => setValues((current) => ({ ...current, [spec.name]: next }))}
-            />
-          ))}
-          <p className="text-sm text-muted">
-            A blank field is sent as missing; the model fills it with a typical value from its
-            training data.
-          </p>
-          <div>
-            <button
-              type="submit"
-              className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60"
-            >
-              {submitting ? "Predicting…" : "Predict"}
-            </button>
-          </div>
-        </fieldset>
-      </form>
-
-      {error && (
-        <p role="alert" className="rounded-md border border-danger p-3 text-danger">
-          {error}
-        </p>
+        </Alert>
       )}
 
-      <div role="status" aria-live="polite">
-        {result && (
-          <div className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
-            <p>
-              Predicted {model.target_column}:{" "}
-              <strong className="text-2xl">
-                {typeof prediction === "number" ? formatNumber(prediction, 4) : String(prediction)}
-              </strong>
-            </p>
-            {probabilities && (
-              <table className="text-sm">
-                <caption className="sr-only">Class probabilities</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="pr-4 text-left">Class</th>
-                    <th scope="col" className="text-right">Probability</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(probabilities)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([label, probability]) => (
-                      <tr key={label}>
-                        <th scope="row" className="pr-4 text-left font-medium">{label}</th>
-                        <td className="text-right tabular-nums">{(probability * 100).toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-            <p className="text-sm text-muted">
-              Model version {result.model_version}
-              {result.request_id ? ` · request ${result.request_id}` : ""}
-            </p>
-          </div>
-        )}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <form onSubmit={submit} className={cn(cardClass, "rounded-2xl p-6 lg:col-span-7")}>
+          <fieldset disabled={!approved || submitting} className="flex flex-col gap-5">
+            <legend className="sr-only">Feature values</legend>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {model.feature_schema.map((spec) => (
+                <FeatureInput
+                  key={spec.name}
+                  spec={spec}
+                  value={values[spec.name] ?? ""}
+                  onChange={(next) => setValues((current) => ({ ...current, [spec.name]: next }))}
+                />
+              ))}
+            </div>
+            {error && <Alert role="alert">{error}</Alert>}
+            <div>
+              <button type="submit" className={buttonClass("primary")}>
+                <LuZap aria-hidden="true" className="size-4" />
+                {submitting ? "Predicting…" : "Predict"}
+              </button>
+            </div>
+          </fieldset>
+        </form>
+
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(cardClass, "rounded-2xl p-6 lg:sticky lg:top-24 lg:col-span-5")}
+        >
+          {result ? (
+            <div className="flex flex-col gap-5">
+              <div className="flex items-center gap-2 text-sm font-medium text-success">
+                <LuSparkles aria-hidden="true" className="size-4" />
+                Prediction
+              </div>
+              <p className="flex flex-col gap-1">
+                <span className="text-sm text-muted">Predicted {model.target_column}:</span>
+                <strong className="text-4xl font-semibold tracking-tight break-all tabular-nums">
+                  {predictionText(prediction)}
+                </strong>
+              </p>
+              {probabilities && (
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Class probabilities</caption>
+                  <thead className="text-xs text-muted">
+                    <tr>
+                      <th scope="col" className="pb-2 text-left font-medium">Class</th>
+                      <th scope="col" className="pb-2 text-right font-medium">Probability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(probabilities)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([label, probability], index) => (
+                        <tr key={label}>
+                          <th scope="row" className="py-1.5 pr-4 text-left font-medium">
+                            <span className="break-all">{label}</span>
+                            <span aria-hidden="true" className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-surface">
+                              <motion.span
+                                className={cn("block h-full rounded-full", index === 0 ? "bg-accent" : "bg-text/25")}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${probability * 100}%` }}
+                                transition={{ type: "spring", stiffness: 120, damping: 22 }}
+                              />
+                            </span>
+                          </th>
+                          <td className="py-1.5 text-right align-top tabular-nums">
+                            {(probability * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="border-t border-border/60 pt-4 text-xs text-muted">
+                Model version {result.model_version}
+                {result.request_id ? ` · request ${result.request_id}` : ""}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-8 text-center text-muted">
+              <span
+                aria-hidden="true"
+                className="flex size-12 items-center justify-center rounded-2xl bg-surface text-text/60"
+              >
+                <LuMousePointerClick className="size-5" />
+              </span>
+              <p className="text-sm">The prediction will appear here.</p>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
