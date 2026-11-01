@@ -72,6 +72,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
       days_after_initiation = 1
     }
   }
+
+  rule {
+    id     = "expire-temporary-objects"
+    status = "Enabled"
+
+    filter {
+      tag {
+        key   = "lifecycle"
+        value = "temporary"
+      }
+    }
+
+    expiration {
+      days = 7
+    }
+  }
 }
 
 data "aws_iam_policy_document" "bucket_tls_only" {

@@ -6,7 +6,7 @@ Used by both the API and the worker process, so it must not import web-framework
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import CursorResult, delete, select, update
+from sqlalchemy import CursorResult, delete, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.time import utc_now
@@ -36,6 +36,17 @@ def get_experiment(session: Session, owner_id: str, experiment_id: str) -> Exper
 def find_by_idempotency_key(session: Session, owner_id: str, key: str) -> Experiment | None:
     return session.scalar(
         select(Experiment).where(Experiment.owner_id == owner_id, Experiment.idempotency_key == key)
+    )
+
+
+def count_recent(session: Session, owner_id: str, since: datetime) -> int:
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(Experiment)
+            .where(Experiment.owner_id == owner_id, Experiment.created_at >= since)
+        )
+        or 0
     )
 
 

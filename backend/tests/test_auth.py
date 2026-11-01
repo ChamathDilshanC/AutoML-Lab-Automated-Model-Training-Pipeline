@@ -25,6 +25,7 @@ from app.core.passwords import (
 )
 from app.core.rate_limit import RateLimiter
 from app.core.tokens import TokenError, create_access_token, decode_access_token
+from app.db import users as user_repo
 from app.db.models import AuditEvent, Dataset, User
 from app.main import create_app
 from tests.conftest import TEST_PASSWORD, TEST_SECRET, TestUser
@@ -386,6 +387,38 @@ def test_cli_claims_data_created_before_accounts_existed(
         assert dataset is not None and dataset.owner_id == alice.user_id
     with pytest.raises(ValueError, match="No such user"):
         cli.claim_legacy("nobody")
+
+
+def test_cli_links_google_identity_and_owned_data(
+    cli_db: None, alice: TestUser, session_factory: sessionmaker[Session]
+) -> None:
+    with session_factory() as session:
+        google = user_repo.create_google_user(
+            session, subject="google-link-subject", email="alice@example.com"
+        )
+        session.add(
+            Dataset(
+                dataset_id="ds_google",
+                owner_id=google.user_id,
+                storage_key="datasets/google/ds_google/source.csv",
+                original_filename="google.csv",
+                size_bytes=1,
+                status="READY",
+            )
+        )
+        session.commit()
+
+    assert cli.link_google("alice", "ALICE@example.com") == {
+        "datasets": 1,
+        "experiments": 0,
+        "models": 0,
+    }
+    with session_factory() as session:
+        dataset = session.get(Dataset, "ds_google")
+        user = session.get(User, alice.user_id)
+        assert dataset is not None and dataset.owner_id == alice.user_id
+        assert user is not None and user.email == "alice@example.com"
+        assert user.auth_subject == "google-link-subject"
 
 
 def test_the_cli_hashes_passwords_and_never_stores_them(

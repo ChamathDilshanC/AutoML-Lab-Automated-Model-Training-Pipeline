@@ -9,6 +9,11 @@ class TokenResponse(BaseModel):
     expires_in: int  # seconds
 
 
+class GoogleTokenRequest(BaseModel):
+    access_token: str
+
+
 class UserResponse(BaseModel):
     user_id: str
     username: str
+    email: str | None = None

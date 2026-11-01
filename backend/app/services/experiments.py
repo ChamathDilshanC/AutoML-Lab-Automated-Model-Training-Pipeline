@@ -4,12 +4,13 @@ Training itself runs in the worker process (backend/worker); nothing here trains
 """
 
 import uuid
+from datetime import timedelta
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
-from app.core.time import as_utc
+from app.core.time import as_utc, utc_now
 from app.db import experiments as repo
 from app.db.models import Dataset, Experiment, ExperimentRun
 from app.schemas.datasets import DatasetStatus
@@ -92,6 +93,7 @@ def create_experiment(
     dataset: Dataset,
     payload: ExperimentCreate,
     idempotency_key: str | None,
+    daily_limit: int = 0,
 ) -> tuple[Experiment, bool]:
     """Queue an experiment. Returns it and whether it is new.
 
@@ -101,6 +103,16 @@ def create_experiment(
         existing = repo.find_by_idempotency_key(session, owner_id, idempotency_key)
         if existing is not None:
             return existing, False
+
+    if daily_limit:
+        recent = repo.count_recent(session, owner_id, utc_now() - timedelta(hours=24))
+        if recent >= daily_limit:
+            raise ApiError(
+                429,
+                "RATE_LIMITED",
+                "Daily experiment limit reached. Try again after the oldest experiment expires.",
+                headers={"Retry-After": "86400"},
+            )
 
     metric, algorithms = validate_config(dataset, payload)
     try:

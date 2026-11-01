@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { errorMessage } from "@/lib/api";
 import { safeNextPath } from "@/lib/auth";
@@ -9,77 +9,66 @@ import { safeNextPath } from "@/lib/auth";
 export default function LoginForm() {
   const router = useRouter();
   const next = safeNextPath(useSearchParams().get("next"));
-  const { auth, signIn } = useAuth();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const { auth, signInWithGoogle } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const handledRedirect = useRef(false);
 
   // Once signed in (here or in another visit), go where the user was headed.
   useEffect(() => {
     if (auth.status === "authenticated") router.replace(next);
   }, [auth.status, next, router]);
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await signIn(username.trim(), password);
-    } catch (err) {
-      setError(errorMessage(err));
-      setSubmitting(false);
+  useEffect(() => {
+    if (handledRedirect.current) return;
+    handledRedirect.current = true;
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = fragment.get("access_token");
+    const providerError = fragment.get("error_description") ?? fragment.get("error");
+    if (!accessToken && !providerError) return;
+    window.history.replaceState(null, "", `/login${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}`);
+    if (providerError) {
+      queueMicrotask(() => setError("Google sign-in was cancelled or failed. Please try again."));
+      return;
     }
+    if (!accessToken) return;
+    queueMicrotask(() => {
+      setSubmitting(true);
+      signInWithGoogle(accessToken)
+        .catch((err) => setError(errorMessage(err)))
+        .finally(() => setSubmitting(false));
+    });
+  }, [next, signInWithGoogle]);
+
+  function startGoogleSignIn() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!url) {
+      setError("Google sign-in is not configured.");
+      return;
+    }
+    const redirect = new URL("/login", window.location.origin);
+    if (next !== "/") redirect.searchParams.set("next", next);
+    window.open(
+      `${url.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirect.toString())}`,
+      "_self",
+    );
   }
 
-  const field = "rounded-md border border-border bg-bg px-3 py-2";
-
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="username" className="font-medium">
-          Username
-        </label>
-        <input
-          id="username"
-          name="username"
-          autoComplete="username"
-          autoCapitalize="none"
-          required
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-          className={field}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="font-medium">
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className={field}
-        />
-      </div>
+    <div className="flex flex-col gap-4">
       {error && (
         <p role="alert" className="rounded-md border border-danger p-3 text-danger">
           {error}
         </p>
       )}
-      <div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60"
-        >
-          {submitting ? "Signing in…" : "Sign in"}
-        </button>
-      </div>
-    </form>
+      <button
+        type="button"
+        onClick={startGoogleSignIn}
+        disabled={submitting}
+        className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60"
+      >
+        {submitting ? "Signing in…" : "Sign in with Google"}
+      </button>
+    </div>
   );
 }

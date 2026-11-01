@@ -24,7 +24,7 @@ export default function AppHeader() {
         {auth.status === "authenticated" && (
           <div className="flex items-center gap-3 text-sm">
             <span>
-              Signed in as <strong data-testid="username">{auth.username}</strong>
+              Signed in as               <strong data-testid="username">{auth.email ?? auth.username}</strong>
             </span>
             <button
               type="button"
