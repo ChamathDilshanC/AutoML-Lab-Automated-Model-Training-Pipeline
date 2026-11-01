@@ -63,12 +63,17 @@ These are implied by PRD requirements but not yet agreed.
 
 ## 4. Payload sketches (Proposed — field names may change)
 
-### 4.0 Auth routes (**Implemented**, M7)
-There is no public sign-up; accounts are created with `python -m app.cli create-user` ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)).
+### 4.0 Auth routes (**Implemented**, M7/M9)
+Cloud users sign in with Google through Supabase Auth. Local password accounts can be created with
+`python -m app.cli create-user` when `PASSWORD_LOGIN_ENABLED=true` ([ADR 0010](ADR/0010-google-sign-in-with-supabase.md)).
 
 **`POST /api/v1/auth/login`** takes `application/x-www-form-urlencoded` `username` and `password` (the OAuth2 password form) and returns `{ "access_token": "...", "token_type": "bearer", "expires_in": 3600 }`. Usernames are case-insensitive. A wrong password, an unknown user and a disabled user all return the same `401` message, "Incorrect username or password.". Attempts are limited per client address (default 10 per minute, **proposed**); beyond that the answer is `429 RATE_LIMITED` with `Retry-After`, even for a correct password.
 
-**`GET /api/v1/auth/me`** returns `{ user_id, username }` for the token's user.
+**`POST /api/v1/auth/google`** accepts `{ "access_token": "..." }`, verifies the configured
+Supabase issuer, audience and signing key, and returns the application bearer response. Invalid
+provider tokens return generic `401 UNAUTHENTICATED`.
+
+**`GET /api/v1/auth/me`** returns `{ user_id, username, email }` for the token's user.
 
 Tokens are signed JWTs (HS256), valid for 60 minutes by default. The user is looked up on every request, so disabling or deleting an account ends its tokens immediately. There are no refresh tokens and no server-side logout.
 

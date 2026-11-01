@@ -47,6 +47,15 @@ def claim_legacy(username: str) -> dict[str, int]:
         return user_repo.claim_legacy_data(session, user.user_id)
 
 
+def link_google(username: str, email: str) -> dict[str, int]:
+    """Link a Google identity that has already signed in to a password user."""
+    create_local_tables()
+    with SessionLocal() as session:
+        counts = user_repo.link_google_user(session, password_username=username, google_email=email)
+        record_audit(session, "user.google_link", actor_id=None, resource_type="user")
+        return counts
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -62,6 +71,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     claim.add_argument("username")
 
+    link = commands.add_parser(
+        "link-google",
+        help="merge a Google identity into an existing password user's data",
+    )
+    link.add_argument("username", help="existing password username")
+    link.add_argument("email", help="email returned by the verified Google sign-in")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "create-user":
@@ -73,9 +89,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                     raise ValueError("The passwords do not match.")
             user_id = create_user(args.username, password)
             print(f"Created user {args.username.strip().lower()} ({user_id}).")
-        else:
+        elif args.command == "claim-legacy":
             counts = claim_legacy(args.username)
             print("Reassigned: " + ", ".join(f"{count} {name}" for name, count in counts.items()))
+        else:
+            counts = link_google(args.username, args.email)
+            print("Linked: " + ", ".join(f"{count} {name}" for name, count in counts.items()))
     except ValueError as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

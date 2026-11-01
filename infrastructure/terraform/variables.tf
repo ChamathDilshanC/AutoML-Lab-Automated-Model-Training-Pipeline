@@ -220,6 +220,54 @@ variable "trusted_proxy_hops" {
   default     = 1
 }
 
+variable "supabase_url" {
+  description = "Supabase project URL used for Google Auth verification."
+  type        = string
+  default     = null
+}
+
+variable "supabase_jwt_secret" {
+  description = "Supabase JWT secret. Pass through TF_VAR_supabase_jwt_secret, never a file."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "supabase_jwks" {
+  description = "Optional Supabase JWKS JSON for asymmetric token verification."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "supabase_jwt_algorithm" {
+  description = "Pinned Supabase JWT algorithm."
+  type        = string
+  default     = "HS256"
+
+  validation {
+    condition     = contains(["HS256", "RS256", "ES256"], var.supabase_jwt_algorithm)
+    error_message = "Use HS256, RS256 or ES256."
+  }
+}
+
+variable "daily_experiment_limit" {
+  description = "Maximum new experiments per user in a rolling 24-hour window; zero is unlimited."
+  type        = number
+  default     = 20
+
+  validation {
+    condition     = var.daily_experiment_limit >= 0
+    error_message = "Use zero or a positive daily experiment limit."
+  }
+}
+
+variable "enable_worker_spot" {
+  description = "Run the interruptible training worker on Fargate Spot. Queue redelivery safely retries interrupted jobs."
+  type        = bool
+  default     = true
+}
+
 variable "log_retention_days" {
   description = "How long worker and API logs are kept, in days."
   type        = number

@@ -75,6 +75,14 @@ export function login(username: string, password: string): Promise<TokenResponse
   });
 }
 
+export function googleLogin(accessToken: string): Promise<TokenResponse> {
+  return request<TokenResponse>("/api/v1/auth/google", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ access_token: accessToken }),
+  });
+}
+
 export function getMe(signal?: AbortSignal): Promise<CurrentUser> {
   return request<CurrentUser>("/api/v1/auth/me", { signal });
 }

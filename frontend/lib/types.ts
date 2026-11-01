@@ -168,6 +168,7 @@ export interface TokenResponse {
 export interface CurrentUser {
   user_id: string;
   username: string;
+  email?: string | null;
 }
 
 /** Where to send a file's bytes: this API (local mode) or a presigned storage URL (S3 mode). */

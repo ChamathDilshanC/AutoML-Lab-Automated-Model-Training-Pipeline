@@ -29,8 +29,17 @@ locals {
   # front of it (the Function URL's one), used to find the real client address for the sign-in
   # limiter.
   api_environment = {
-    CORS_ORIGINS       = jsonencode(local.frontend_origins)
-    TRUSTED_PROXY_HOPS = tostring(var.trusted_proxy_hops)
+    CORS_ORIGINS           = jsonencode(local.frontend_origins)
+    TRUSTED_PROXY_HOPS     = tostring(var.trusted_proxy_hops)
+    PASSWORD_LOGIN_ENABLED = "false"
+    DAILY_EXPERIMENT_LIMIT = tostring(var.daily_experiment_limit)
+  }
+
+  supabase_environment = {
+    SUPABASE_URL           = var.supabase_url
+    SUPABASE_JWT_SECRET    = var.supabase_jwt_secret
+    SUPABASE_JWKS          = var.supabase_jwks
+    SUPABASE_JWT_ALGORITHM = var.supabase_jwt_algorithm
   }
 
   # The worker (ECS) reads these by reference when its task starts.
@@ -43,6 +52,7 @@ locals {
     # Lambda sets AWS_REGION itself and refuses a function that sets it.
     { for name, value in local.app_environment : name => value if name != "AWS_REGION" },
     local.api_environment,
+    { for name, value in local.supabase_environment : name => value if value != null },
     {
       # The Lambda Web Adapter (backend/Dockerfile) forwards each request to uvicorn on PORT once
       # /health answers. Start-up (imports, migrations) can exceed Lambda's 10 s init limit, so the

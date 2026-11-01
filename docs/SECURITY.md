@@ -31,7 +31,7 @@ Trust boundaries: browser ↔ API · API ↔ storage · API ↔ worker · worker
 | Privilege creep in CI/CD | GitHub OIDC with a narrowly scoped IAM role instead of long-lived keys, where supported |
 
 ## 3. Authentication and authorisation
-- **Implemented (M7):** local accounts, scrypt password hashes and JWT bearer tokens ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)). Details and limits are in § 15.
+- **Implemented:** Google-only cloud sign-in through Supabase Auth, local subject mapping and short-lived JWT bearer tokens ([ADR 0010](ADR/0010-google-sign-in-with-supabase.md)). Local password login remains an opt-in development fallback ([ADR 0004](ADR/0004-local-accounts-and-bearer-tokens.md)).
 - Ownership checks are enforced in the repositories (every lookup filters by the caller's user ID) behind a router-level authentication dependency.
 - The identity provider for a cloud deployment is **Open** (cost and eligibility to be checked before selecting any AWS-managed option). Prediction credentials are the same user tokens; a separate API-key scheme for machine clients is **Open**.
 
@@ -84,7 +84,7 @@ Auth provider; API credential model; rate-limit values; retention windows; wheth
 - **Not implemented at that point:** authentication, rate limiting on `/predict`, revoking approval and removing a deleted dataset's models (all added in M7, § 15). Still open: a prediction-specific request-size limit (the general upload body limit applies) and deleting a single model.
 
 ## 15. Implemented so far (M7)
-**Accounts and passwords.** No public sign-up; an operator creates accounts with `python -m app.cli create-user`. Passwords are 12 to 128 characters, hashed with scrypt and a per-user salt, and compared in constant time. An unknown username costs the same work as a wrong password and gets the same answer, so sign-in does not reveal which usernames exist.
+**Accounts and passwords.** Cloud users sign in with Google through Supabase Auth; the API verifies the signed token locally and stores only the subject and email. Local development may keep password login enabled and create accounts with `python -m app.cli create-user`; production sets `PASSWORD_LOGIN_ENABLED=false`. The API never receives a Google password or fetches JWKS at request time.
 
 **Tokens.** HS256 JWTs signed with `SECRET_KEY` (at least 32 characters, mandatory unless `ENVIRONMENT` is `local`; the app refuses to start without it elsewhere). The algorithm is pinned, `exp`, `iat` and `sub` are required, tokens last 60 minutes, and the user is loaded on every request so a disabled or deleted account loses access immediately. Tests forge expired, wrong-key, `alg: none`, wrong-algorithm, claim-less and tampered tokens; all are rejected.
 

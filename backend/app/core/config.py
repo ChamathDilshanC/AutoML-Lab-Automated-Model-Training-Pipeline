@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60
     predict_rate_limit_per_minute: int = 60
     login_rate_limit_per_minute: int = 10
+    password_login_enabled: bool = True
+    daily_experiment_limit: int = 20
+    supabase_url: str | None = None
+    supabase_jwt_secret: SecretStr | None = None
+    supabase_jwks: str | None = None
+    supabase_jwt_algorithm: Literal["HS256", "RS256", "ES256"] = "HS256"
     # How many reverse proxies sit in front of the API (a Lambda Function URL adds one). 0 means
     # none: the X-Forwarded-For header is then ignored, so a client cannot spoof its address.
     trusted_proxy_hops: int = 0
@@ -93,6 +99,10 @@ class Settings(BaseSettings):
             raise ValueError("S3_BUCKET is required when STORAGE_MODE=s3.")
         if self.job_mode == "sqs" and not self.sqs_queue_url:
             raise ValueError("SQS_QUEUE_URL is required when JOB_MODE=sqs.")
+        if self.daily_experiment_limit < 0:
+            raise ValueError("DAILY_EXPERIMENT_LIMIT must be zero or greater.")
+        if self.supabase_jwt_algorithm == "HS256" and self.supabase_jwks:
+            raise ValueError("SUPABASE_JWT_ALGORITHM=HS256 cannot be used with SUPABASE_JWKS.")
         if not 1 <= self.s3_presign_expires_seconds <= 3600:
             raise ValueError("S3_PRESIGN_EXPIRES_SECONDS must be between 1 and 3600.")
         if not 0 <= self.sqs_wait_seconds <= 20:

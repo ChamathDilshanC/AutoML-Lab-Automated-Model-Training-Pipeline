@@ -1,18 +1,19 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
-import { errorMessage, getMe, login } from "@/lib/api";
+import { errorMessage, getMe, googleLogin, login } from "@/lib/api";
 import { clearToken, getToken, setToken, subscribe } from "@/lib/auth";
 
 export type AuthState =
   | { status: "loading" }
   | { status: "anonymous" }
   | { status: "error"; message: string }
-  | { status: "authenticated"; username: string };
+  | { status: "authenticated"; username: string; email: string | null };
 
 interface AuthContextValue {
   auth: AuthState;
   signIn: (username: string, password: string) => Promise<void>;
+  signInWithGoogle: (accessToken: string) => Promise<void>;
   signOut: () => void;
   retry: () => void;
 }
@@ -28,7 +29,9 @@ export function useAuth(): AuthContextValue {
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   // undefined while rendering on the server and during hydration, when sessionStorage is unknown.
   const token = useSyncExternalStore<string | null | undefined>(subscribe, getToken, () => undefined);
-  const [me, setMe] = useState<{ token: string; username: string } | null>(null);
+  const [me, setMe] = useState<{ token: string; username: string; email: string | null } | null>(
+    null,
+  );
   const [failure, setFailure] = useState<{ token: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -37,7 +40,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     let cancelled = false;
     getMe()
       .then((user) => {
-        if (!cancelled) setMe({ token, username: user.username });
+        if (!cancelled) setMe({ token, username: user.username, email: user.email ?? null });
       })
       .catch((err) => {
         // A 401 has already signed the user out (see lib/api.ts). Anything else, such as the
@@ -52,7 +55,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   let auth: AuthState;
   if (token === undefined) auth = { status: "loading" };
   else if (token === null) auth = { status: "anonymous" };
-  else if (me?.token === token) auth = { status: "authenticated", username: me.username };
+  else if (me?.token === token)
+    auth = { status: "authenticated", username: me.username, email: me.email };
   else if (failure?.token === token) auth = { status: "error", message: failure.message };
   else auth = { status: "loading" };
 
@@ -60,6 +64,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     auth,
     signIn: async (username, password) => {
       const { access_token } = await login(username, password);
+      setToken(access_token);
+    },
+    signInWithGoogle: async (supabaseToken) => {
+      const { access_token } = await googleLogin(supabaseToken);
       setToken(access_token);
     },
     signOut: () => clearToken(),

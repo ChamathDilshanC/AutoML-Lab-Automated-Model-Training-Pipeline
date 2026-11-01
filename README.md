@@ -35,6 +35,22 @@ Local mode needs none of the AWS parts: SQLite, a local folder for files, and a 
 | **CI/CD and hosting** | ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) |
 | **Quality** | ![pytest](https://img.shields.io/badge/pytest-0A9EDC?logo=pytest&logoColor=white) ![Ruff](https://img.shields.io/badge/Ruff-D7FF64?logo=ruff&logoColor=black) ![mypy](https://img.shields.io/badge/mypy-2A6DB2) ![moto](https://img.shields.io/badge/moto-AWS_mocks-232F3E) ![ESLint](https://img.shields.io/badge/ESLint-4B32C3?logo=eslint&logoColor=white) ![actionlint](https://img.shields.io/badge/actionlint-2088FF) |
 
+### Technology icons
+
+These icons use the [theSVG CDN](https://thesvg.org/docs), so they need no install, build step or JavaScript:
+
+<p>
+  <img src="https://thesvg.org/icons/nextjs/default.svg" width="32" height="32" alt="Next.js" />
+  <img src="https://thesvg.org/icons/python/default.svg" width="32" height="32" alt="Python" />
+  <img src="https://thesvg.org/icons/fastapi/default.svg" width="32" height="32" alt="FastAPI" />
+  <img src="https://thesvg.org/icons/scikit-learn/default.svg" width="32" height="32" alt="scikit-learn" />
+  <img src="https://thesvg.org/icons/aws-s3/default.svg" width="32" height="32" alt="Amazon S3" />
+  <img src="https://thesvg.org/icons/aws-lambda/default.svg" width="32" height="32" alt="AWS Lambda" />
+  <img src="https://thesvg.org/icons/amazon-eventbridge/default.svg" width="32" height="32" alt="Amazon EventBridge" />
+  <img src="https://thesvg.org/icons/amazon-cloudwatch/default.svg" width="32" height="32" alt="Amazon CloudWatch" />
+  <img src="https://thesvg.org/icons/aws-iam/default.svg" width="32" height="32" alt="AWS IAM" />
+</p>
+
 ## AWS components
 - **Network:** one VPC (`10.20.0.0/16`) with two public and two private subnets across two availability zones, an internet gateway, **no NAT gateway**, an S3 gateway endpoint and an SQS interface endpoint.
 - **API:** a Lambda function (container image, 2 GB) in the private subnets with the `api` security group, behind a public Function URL. The database password and the token-signing key reach it as encrypted environment variables ([ADR 0007](docs/ADR/0007-lambda-api-and-amplify-frontend.md)).

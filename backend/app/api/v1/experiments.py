@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_publisher
+from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.core.security import get_owner_id
 from app.db import experiments as repo
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/experiments", tags=["experiments"])
 SessionDep = Annotated[Session, Depends(get_session)]
 OwnerDep = Annotated[str, Depends(get_owner_id)]
 PublisherDep = Annotated[JobPublisher, Depends(get_publisher)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _owned_experiment(session: Session, owner_id: str, experiment_id: str) -> Experiment:
@@ -48,6 +50,7 @@ def create_experiment(
     session: SessionDep,
     owner_id: OwnerDep,
     publisher: PublisherDep,
+    settings: SettingsDep,
     idempotency_key: Annotated[str | None, Header(max_length=128)] = None,
 ) -> ExperimentResponse:
     """Queue an experiment for the worker. Training does not happen in this request."""
@@ -55,7 +58,12 @@ def create_experiment(
     if dataset is None:
         raise ApiError(404, "NOT_FOUND", "Dataset not found.")
     experiment, created = experiment_service.create_experiment(
-        session, owner_id, dataset, payload, idempotency_key
+        session,
+        owner_id,
+        dataset,
+        payload,
+        idempotency_key,
+        settings.daily_experiment_limit,
     )
     if created:
         try:
