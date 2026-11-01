@@ -1,33 +1,31 @@
 @import "tailwindcss";
 
-/* Semantic tokens from docs/DESIGN_SYSTEM.md. Components use these, never raw colours. */
+/* Semantic tokens from docs/DESIGN_SYSTEM.md. Components use these, never raw colours.
+   The app uses the light (white) theme only. */
 :root {
+  color-scheme: light;
   --bg: #ffffff;
   --surface: #f3f4f6;
   --text: #111827;
   --text-muted: #4b5563;
   --border: #d1d5db;
+  --primary: #0a0a0a;
+  --on-primary: #ffffff;
   --accent: #2563eb;
   --on-accent: #ffffff;
   --success: #15803d;
   --warning: #b45309;
   --danger: #b91c1c;
-  --shadow: 0 18px 50px rgb(15 23 42 / 0.08);
-}
+  --grid-line: #e7e5e4;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1020;
-    --surface: #161c2e;
-    --text: #e5e7eb;
-    --text-muted: #9ca3af;
-    --border: #2b3350;
-    --accent: #60a5fa;
-    --on-accent: #0b1020;
-    --success: #4ade80;
-    --warning: #fbbf24;
-    --danger: #f87171;
-  }
+  /* Names the Unlumen UI components (components/unlumen-ui) expect. */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --muted: var(--border);
+  --muted-foreground: var(--text-muted);
+  --card: var(--bg);
+  --secondary: var(--surface);
+  --ring: var(--accent);
 }
 
 @theme inline {
@@ -36,11 +34,19 @@
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-secondary: var(--secondary);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -51,38 +57,54 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-.app-shell {
-  position: relative;
-  min-height: 100vh;
-  overflow: hidden;
-  background: var(--bg);
+::selection {
+  background: rgb(37 99 235 / 0.15);
 }
 
+/* Dashed grid that fades in from the bottom-right corner of the window. */
 .app-grid {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, #e7e5e4 1px, transparent 1px),
-    linear-gradient(to bottom, #e7e5e4 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 20px 20px;
+  background-position:
+    0 0,
+    0 0;
   mask-image:
-    repeating-linear-gradient(to right, #000 0 3px, transparent 3px 8px),
-    repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 8px),
+    repeating-linear-gradient(to right, black 0px, black 3px, transparent 3px, transparent 8px),
+    repeating-linear-gradient(to bottom, black 0px, black 3px, transparent 3px, transparent 8px),
+    radial-gradient(ellipse 80% 80% at 100% 100%, #000 50%, transparent 90%);
+  -webkit-mask-image:
+    repeating-linear-gradient(to right, black 0px, black 3px, transparent 3px, transparent 8px),
+    repeating-linear-gradient(to bottom, black 0px, black 3px, transparent 3px, transparent 8px),
     radial-gradient(ellipse 80% 80% at 100% 100%, #000 50%, transparent 90%);
   mask-composite: intersect;
-  -webkit-mask-image:
-    repeating-linear-gradient(to right, #000 0 3px, transparent 3px 8px),
-    repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 8px),
-    radial-gradient(ellipse 80% 80% at 100% 100%, #000 50%, transparent 90%);
   -webkit-mask-composite: source-in;
-  opacity: 0.65;
+}
+
+/* Native <dialog> (ConfirmDialog): fade and lift in. */
+dialog[open] {
+  animation: dialog-in 160ms ease-out;
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
+  backdrop-filter: blur(4px);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
 }
 
 .automl-toast {
   border-radius: 1rem;
-  box-shadow: var(--shadow);
 }
 
 :focus-visible {

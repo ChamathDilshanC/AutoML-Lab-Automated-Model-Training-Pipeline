@@ -2,10 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FcGoogle } from "react-icons/fc";
+import { LuLoaderCircle } from "react-icons/lu";
 import { useAuth } from "@/components/AuthProvider";
+import Alert from "@/components/ui/Alert";
 import { errorMessage } from "@/lib/api";
 import { safeNextPath } from "@/lib/auth";
-import { notifyError } from "@/lib/notifications";
+import { notifyError, notifyInfo } from "@/lib/notifications";
+import { buttonClass } from "@/lib/ui";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -57,6 +61,7 @@ export default function LoginForm() {
       notifyError("Google sign-in unavailable", message);
       return;
     }
+    notifyInfo("Redirecting to Google", "You will come back here once you have signed in.");
     const redirect = new URL("/login", window.location.origin);
     if (next !== "/") redirect.searchParams.set("next", next);
     window.open(
@@ -67,17 +72,18 @@ export default function LoginForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      {error && (
-        <p role="alert" className="rounded-md border border-danger p-3 text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Alert role="alert">{error}</Alert>}
       <button
         type="button"
         onClick={startGoogleSignIn}
         disabled={submitting}
-        className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60"
+        className={buttonClass("secondary", "lg", "w-full")}
       >
+        {submitting ? (
+          <LuLoaderCircle aria-hidden="true" className="size-5 animate-spin" />
+        ) : (
+          <FcGoogle aria-hidden="true" className="size-5" />
+        )}
         {submitting ? "Signing in…" : "Sign in with Google"}
       </button>
     </div>

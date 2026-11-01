@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthProvider from "@/components/AuthProvider";
+import MotionProvider from "@/components/MotionProvider";
+import SiteFooter from "@/components/SiteFooter";
 import ToastProvider from "@/components/ToastProvider";
 import "./globals.css";
 
@@ -25,14 +27,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <ToastProvider />
-          <div className="app-shell">
+      <body className="min-h-full">
+        <a
+          href="#main"
+          className="sr-only rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
+        >
+          Skip to content
+        </a>
+        <MotionProvider>
+          <AuthProvider>
+            <ToastProvider />
             <div className="app-grid" aria-hidden="true" />
-            <div className="relative z-10 flex min-h-screen flex-col">{children}</div>
-          </div>
-        </AuthProvider>
+            <div className="relative z-10 flex min-h-screen flex-col">
+              {children}
+              <SiteFooter />
+            </div>
+          </AuthProvider>
+        </MotionProvider>
       </body>
     </html>
   );

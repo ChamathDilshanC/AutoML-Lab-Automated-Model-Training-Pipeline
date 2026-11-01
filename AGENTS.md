@@ -100,7 +100,7 @@ Tests added/updated and passing, lint and type checks passing (once defined), do
 - Stage explicit paths only (`git add <paths>`); do not use `git add .` or `git add -A`. Leave unrelated pre-existing changes untouched.
 - Commit messages: short imperative subject with a conventional prefix (`docs:`, `feat:`, `fix:`, `chore:`, `test:`).
 - Push the branch with a normal push and open a pull request into `main`. `main` is protected: the `backend` and `frontend` CI checks must pass. Merge only when the PR is mergeable.
-- After a PR is merged, delete its feature branch on GitHub and locally (`gh pr merge --merge --delete-branch`, or `git push origin --delete <branch>` and `git branch -d <branch>`). Never delete a branch whose PR is not merged.
+- Keep feature branches after their PR is merged, on GitHub and locally: merge with `gh pr merge --merge` (never `--delete-branch`) and do not run `git push origin --delete` or `git branch -d`. Delete a branch only when the maintainer asks for that branch by name.
 
 ## 13. Authorship and attribution (maintainer requirement)
 The only approved maintainer and contributor identity for project metadata, documentation and commits is **ChamathDilshanC**.

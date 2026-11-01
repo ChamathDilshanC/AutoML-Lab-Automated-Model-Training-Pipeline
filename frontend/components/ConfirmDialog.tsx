@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { LuShieldCheck, LuTriangleAlert } from "react-icons/lu";
+import Alert from "@/components/ui/Alert";
+import { buttonClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -41,6 +45,8 @@ export default function ConfirmDialog({
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
+  const Icon = destructive ? LuTriangleAlert : LuShieldCheck;
+
   return (
     <dialog
       ref={ref}
@@ -49,23 +55,36 @@ export default function ConfirmDialog({
         event.preventDefault(); // Escape: let the parent decide, and not while busy
         if (!busy) onCancel();
       }}
-      className="m-auto w-full max-w-md rounded-lg border border-border bg-bg p-6 text-text backdrop:bg-black/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-border/70 bg-bg p-6 text-text shadow-2xl shadow-black/20 sm:p-7"
     >
-      <h2 id={titleId} className="text-lg font-semibold">
-        {title}
-      </h2>
-      <div className="mt-2 flex flex-col gap-2">{children}</div>
+      <div className="flex gap-4">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-2xl",
+            destructive ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent",
+          )}
+        >
+          <Icon className="size-5" />
+        </span>
+        <div className="flex min-w-0 flex-col gap-2">
+          <h2 id={titleId} className="text-lg font-semibold tracking-tight">
+            {title}
+          </h2>
+          <div className="flex flex-col gap-2 text-sm leading-6 text-muted">{children}</div>
+        </div>
+      </div>
       {error && (
-        <p role="alert" className="mt-3 rounded-md border border-danger p-3 text-danger">
+        <Alert role="alert" className="mt-4">
           {error}
-        </p>
+        </Alert>
       )}
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="rounded-md border border-border px-4 py-2 font-medium disabled:opacity-60"
+          className={buttonClass("secondary")}
         >
           Cancel
         </button>
@@ -73,9 +92,7 @@ export default function ConfirmDialog({
           type="button"
           onClick={onConfirm}
           disabled={busy}
-          className={`rounded-md px-4 py-2 font-medium disabled:opacity-60 ${
-            destructive ? "bg-danger text-bg" : "bg-accent text-on-accent"
-          }`}
+          className={buttonClass(destructive ? "danger" : "primary")}
         >
           {busy ? (busyLabel ?? "Working…") : confirmLabel}
         </button>

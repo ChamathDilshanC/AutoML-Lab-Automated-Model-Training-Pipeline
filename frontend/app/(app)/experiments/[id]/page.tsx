@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import ExperimentDetail from "@/components/ExperimentDetail";
+import { Breadcrumbs, PageMain } from "@/components/PageHeader";
+import { LoadingState } from "@/components/ui/States";
 
 // Rendered behind the sign-in gate (see layout.tsx), so it is client-rendered by design.
 export const instant = false;
@@ -14,16 +15,11 @@ async function ExperimentView({ params }: { params: Promise<{ id: string }> }) {
 
 export default function ExperimentPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
-      <nav aria-label="Breadcrumb" className="text-sm text-muted">
-        <Link href="/" className="underline">
-          Home
-        </Link>{" "}
-        › Experiment
-      </nav>
-      <Suspense fallback={<p className="text-muted">Loading experiment…</p>}>
+    <PageMain className="gap-8">
+      <Breadcrumbs items={[{ label: "Experiment" }]} />
+      <Suspense fallback={<LoadingState label="Loading experiment…" />}>
         <ExperimentView params={params} />
       </Suspense>
-    </main>
+    </PageMain>
   );
 }
