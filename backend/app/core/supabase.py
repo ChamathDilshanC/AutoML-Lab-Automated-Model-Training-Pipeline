@@ -52,9 +52,7 @@ def verify_supabase_token(token: str, settings: Settings) -> tuple[str, str]:
     except SupabaseTokenError:
         raise
     except (jwt.PyJWTError, json.JSONDecodeError, TypeError, KeyError, ValueError) as exc:
-        raise SupabaseTokenError(
-            f"Invalid Supabase token ({type(exc).__name__})."
-        ) from None
+        raise SupabaseTokenError(f"Invalid Supabase token ({type(exc).__name__}).") from None
 
     subject = claims.get("sub")
     email = claims.get("email")
