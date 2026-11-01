@@ -44,11 +44,11 @@ These icons use the [theSVG CDN](https://thesvg.org/docs), so they need no insta
   <img src="https://thesvg.org/icons/python/default.svg" width="32" height="32" alt="Python" />
   <img src="https://thesvg.org/icons/fastapi/default.svg" width="32" height="32" alt="FastAPI" />
   <img src="https://thesvg.org/icons/scikit-learn/default.svg" width="32" height="32" alt="scikit-learn" />
-  <img src="https://thesvg.org/icons/aws-s3/default.svg" width="32" height="32" alt="Amazon S3" />
-  <img src="https://thesvg.org/icons/aws-lambda/default.svg" width="32" height="32" alt="AWS Lambda" />
-  <img src="https://thesvg.org/icons/amazon-eventbridge/default.svg" width="32" height="32" alt="Amazon EventBridge" />
-  <img src="https://thesvg.org/icons/amazon-cloudwatch/default.svg" width="32" height="32" alt="Amazon CloudWatch" />
-  <img src="https://thesvg.org/icons/aws-iam/default.svg" width="32" height="32" alt="AWS IAM" />
+  <img src="https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/aws-amazon-simple-storage-service/default.svg" width="32" height="32" alt="Amazon S3" />
+  <img src="https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/aws-aws-lambda/default.svg" width="32" height="32" alt="AWS Lambda" />
+  <img src="https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/aws-amazon-eventbridge/default.svg" width="32" height="32" alt="Amazon EventBridge" />
+  <img src="https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/aws-amazon-cloudwatch/default.svg" width="32" height="32" alt="Amazon CloudWatch" />
+  <img src="https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/aws-amazon-cognito/default.svg" width="32" height="32" alt="Amazon Cognito" />
 </p>
 
 ## AWS components
