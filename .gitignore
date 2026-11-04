@@ -42,3 +42,11 @@ tfplan
 Thumbs.db
 .idea/
 .vscode/
+
+# Demo and promo videos: only the final video and the two demo pages are published.
+# Everything else (recordings, Remotion project, scripts, QA frames, drafts) stays local.
+/demo-video/*
+!/demo-video/06-intro-outro.html
+!/demo-video/07-landing-scroll-page.html
+/promo-video/*
+!/promo-video/final-with-intro.mp4

@@ -6,6 +6,16 @@ Upload a CSV, choose a target column and task (classification or regression), an
 
 **Live:** frontend https://automl-lab-ui.vercel.app · API https://qr2bs6hofh2mxilfqoz5uk2f5i0janut.lambda-url.us-east-1.on.aws (`/health`). Sign-in is required and there is no public sign-up: an operator creates accounts. Details: [docs/DEPLOYMENT.md § Current deployment](docs/DEPLOYMENT.md#current-deployment).
 
+## Demo video
+
+[![Watch the demo on Google Drive](https://img.shields.io/badge/Watch_the_demo-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1cF0IblAVNfv7WfIVx_Bkj4nipiHXnqfo/view?usp=drive_link)
+
+A 73-second product tour with sound: an animated intro, then the real app from CSV upload to an approved model and a prediction. The scores in it come from a held-out test set on a small synthetic customer-churn dataset and are not a guarantee.
+
+- Video file in the repository: [promo-video/final-with-intro.mp4](promo-video/final-with-intro.mp4)
+- Animated title cards: [demo-video/06-intro-outro.html](demo-video/06-intro-outro.html) (download and open in a browser; press `1` to `4` to play a card)
+- Scrolling product page used in the intro: [demo-video/07-landing-scroll-page.html](demo-video/07-landing-scroll-page.html) (download and open in a browser; the Auto-scroll button scrolls it)
+
 ## How it works
 
 [![AutoML Lab AWS architecture: Next.js frontend on Vercel (Amplify optional), FastAPI on AWS Lambda behind a Function URL, RDS PostgreSQL, S3 and SQS, an ECS Fargate worker started and stopped by CloudWatch alarms and Application Auto Scaling, an operator creating users through a one-off ECS Exec task, and GitHub Actions deploying through OIDC, in a VPC in us-east-1](docs/architecture.png)](docs/architecture.svg)
